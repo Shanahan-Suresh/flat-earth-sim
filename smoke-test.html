@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script type="importmap">{"imports": {"three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/"}}</script>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="report">pending</div>
+<script>
+window.addEventListener('error', function (e) {
+  document.getElementById('report').textContent = 'IMPORT-ERR: ' + e.message + ' @ ' + (e.filename || '') + ':' + (e.lineno || '');
+});
+window.addEventListener('unhandledrejection', function (e) {
+  document.getElementById('report').textContent = 'REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason);
+});
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPixelatedPass } from 'three/addons/postprocessing/RenderPixelatedPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { SimClock } from './js/sim.js';
+import { buildWorld } from './js/world.js';
+import { buildSky, updateSky } from './js/sky.js';
+
+const report = (msg) => {
+  document.getElementById('report').textContent = 'REPORT: ' + msg;
+  document.title = 'REPORT';
+  fetch('/SMOKE_RESULT?msg=' + encodeURIComponent(msg)).catch(() => {});
+};
+try {
+  const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: false, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.setClearColor(0x000000, 0);
+  renderer.setSize(800, 600);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, 800/600, 0.1, 200);
+  camera.position.set(14, 9, 14);
+  camera.lookAt(0, 0, 0);
+  scene.add(new THREE.AmbientLight(0xffd9aa, 0.35));
+  const world = buildWorld(scene);
+  const sky = buildSky(scene);
+  const sim = new SimClock();
+  const toggles = { dome: true, clouds: true, sunBeam: true, shadowObject: false };
+  updateSky(sky, sim, toggles);
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPixelatedPass(4, scene, camera));
+  composer.addPass(new OutputPass());
+  composer.render();
+  const gl = renderer.getContext();
+  const px = new Uint8Array(800 * 600 * 4);
+  gl.readPixels(0, 0, 800, 600, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let lit = 0, colorSet = new Set();
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i] + px[i+1] + px[i+2] > 30) {
+      lit++;
+      if (colorSet.size < 50) colorSet.add((px[i]>>5)+','+(px[i+1]>>5)+','+(px[i+2]>>5));
+    }
+  }
+  report('lit=' + lit + '/480000 distinctColors=' + colorSet.size + ' objectsInScene=' + scene.children.length);
+} catch (e) {
+  report('EXCEPTION: ' + e.message + ' | ' + (e.stack || '').slice(0, 300));
+}
+</script>
+</body>
+</html>

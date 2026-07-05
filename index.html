@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FLAT EARTH SIM</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/": "./vendor/addons/"
+      }
+    }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <!-- Canvas background -->
+  <canvas id="canvas"></canvas>
+
+  <!-- Top-left title block -->
+  <div id="title-block">
+    <div id="title">FLAT EARTH SIM</div>
+    <div id="subtitle">as believed, faithfully rendered</div>
+    <div id="clock-display">Day 172 · 12:00 · Jun · Summer</div>
+    <div id="sun-speed">Sun: 1,204 mph</div>
+  </div>
+
+  <!-- Collapse button (top right of panel area) -->
+  <button id="btn-collapse" class="pixel-btn">[–]</button>
+
+  <!-- Right control panel -->
+  <div id="right-panel">
+
+    <div class="panel-section">
+      <div class="section-title">★ THE HEAVENS</div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-dome" checked>
+        <span>Dome / Firmament</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-clouds" checked>
+        <span>Clouds</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-sunbeam" checked>
+        <span>Sun Beam</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-shadow">
+        <span>Shadow Object</span>
+      </label>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◆ THE EDGE</div>
+      <label class="radio-row">
+        <input type="radio" name="edge" id="edge-icewall" value="icewall" checked>
+        <span>Ice Wall</span>
+      </label>
+      <label class="radio-row">
+        <input type="radio" name="edge" id="edge-waterfall" value="waterfall">
+        <span>Edge Waterfall</span>
+      </label>
+      <label class="radio-row">
+        <input type="radio" name="edge" id="edge-infinite" value="infinite">
+        <span>Infinite Plane</span>
+      </label>
+      <label class="radio-row">
+        <input type="radio" name="edge" id="edge-beyond" value="beyond">
+        <span>Lands Beyond</span>
+      </label>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">⏱ TIME</div>
+      <div class="control-row">
+        <button id="btn-pause" class="pixel-btn">⏸ PAUSE</button>
+      </div>
+      <div class="slider-row">
+        <span>Speed</span>
+        <input type="range" id="slider-speed" min="0" max="20" value="1" step="0.25">
+        <span id="label-speed">1×</span>
+      </div>
+      <div class="slider-row">
+        <span>Day</span>
+        <input type="range" id="slider-day" min="0" max="364" value="172">
+      </div>
+      <div id="label-day" class="label-small">Day 172 · Jun · Summer</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ LOOK</div>
+      <div class="slider-row">
+        <span>Pixels</span>
+        <input type="range" id="slider-pixel" min="2" max="8" value="4" step="1">
+        <span id="label-pixel">4</span>
+      </div>
+      <div class="control-row">
+        <button id="btn-reset-cam" class="pixel-btn">↺ RESET CAM</button>
+      </div>
+    </div>
+
+    <div class="panel-footer">
+      <button id="btn-about" class="pixel-btn">? ABOUT</button>
+    </div>
+  </div>
+
+  <!-- Lore caption bar -->
+  <div id="lore-caption">
+    Consensus: a 150-ft Antarctic ice wall rings the disc and holds the oceans in — nothing falls off.
+  </div>
+
+  <!-- About modal -->
+  <div id="modal-about" style="display:none;">
+    <div id="modal-box">
+      <div class="modal-title">FLAT EARTH SIM</div>
+      <p>A faithful pixel-art render of the consensus flat-earth model as described by TFES (The Flat Earth Society) and related communities. Not a parody — an earnest diorama.</p>
+
+      <div class="modal-table-title">THE MODEL — LORE CONSTANTS</div>
+      <table class="lore-table">
+        <tr><td>Disc radius</td><td>12,450 mi</td></tr>
+        <tr><td>Ice wall height</td><td>~150 ft (lore)</td></tr>
+        <tr><td>Sun diameter</td><td>32 mi (upscaled ×13 for visibility)</td></tr>
+        <tr><td>Moon diameter</td><td>32 mi (self-luminous cold light)</td></tr>
+        <tr><td>Sun altitude</td><td>~3,000 mi</td></tr>
+        <tr><td>Sun path radius</td><td>4,600 mi (Jun 21) → 7,840 mi (Dec 21)</td></tr>
+        <tr><td>Sun ground speed</td><td>1,204 mph (Jun) → 2,052 mph (Dec)</td></tr>
+        <tr><td>Moon angular rate</td><td>347.81°/day → 29.53-day synodic month</td></tr>
+        <tr><td>Star wheel period</td><td>23.93 h sidereal</td></tr>
+        <tr><td>Dome apex</td><td>~3,100–6,000 mi est.</td></tr>
+      </table>
+
+      <div class="modal-table-title">WHAT CONSENSUS SAYS</div>
+      <p>Water does NOT fall off — the ice wall contains it. The edge waterfall is an outsider meme; flat earthers disavow it. Gravity is replaced by density &amp; buoyancy + Universal Acceleration (9.8 m/s² upward). The moon is self-luminous cold light. Eclipses are caused by the Shadow Object. Southern 24h daylight is denied by the community.</p>
+
+      <div class="modal-table-title">SOURCES</div>
+      <p>wiki.tfes.org · Wikipedia "Modern flat Earth beliefs" · NCSE "The Rim at the End of the World" · Blake Marnell "Flat Earth Sun Moon &amp; Zodiac Clock" · Rowbotham "Zetetic Astronomy" (1865)</p>
+
+      <div class="modal-table-title">TECH</div>
+      <p>Three.js 0.180.0 vendored · RenderPixelatedPass · All art procedural · Press Start 2P font (OFL) · Run: python -m http.server 8000</p>
+
+      <button id="modal-close" class="pixel-btn">✕ CLOSE</button>
+    </div>
+  </div>
+</body>
+</html>

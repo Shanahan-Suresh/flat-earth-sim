@@ -1,0 +1,303 @@
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('../assets/PressStart2P.ttf') format('truetype');
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: linear-gradient(180deg, #0d0a1f 0%, #1a0d2e 40%, #0a1a2a 70%, #060d18 100%);
+  min-height: 100vh;
+  overflow: hidden;
+  font-family: 'Press Start 2P', monospace;
+  color: #e8dfc0;
+  image-rendering: pixelated;
+}
+
+#canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+
+/* ── Title block ── */
+#title-block {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  background: rgba(10, 10, 30, 0.85);
+  border: 2px solid #4466aa;
+  padding: 10px 14px;
+  max-width: 280px;
+}
+
+#title {
+  font-size: 11px;
+  color: #ffdd66;
+  letter-spacing: 1px;
+  line-height: 1.6;
+  text-shadow: 2px 2px 0 #221100;
+}
+
+#subtitle {
+  font-size: 7px;
+  color: #88aacc;
+  margin-top: 4px;
+  line-height: 1.8;
+}
+
+#clock-display {
+  font-size: 7px;
+  color: #aaddbb;
+  margin-top: 6px;
+  line-height: 1.8;
+}
+
+#sun-speed {
+  font-size: 7px;
+  color: #ffcc66;
+  margin-top: 2px;
+  line-height: 1.8;
+}
+
+/* ── Right panel ── */
+#btn-collapse {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+}
+
+#right-panel {
+  position: fixed;
+  top: 48px;
+  right: 16px;
+  z-index: 10;
+  background: rgba(10, 10, 30, 0.85);
+  border: 2px solid #4466aa;
+  padding: 10px;
+  width: 220px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+#right-panel.collapsed {
+  transform: translateX(240px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.panel-section {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #334466;
+}
+
+.panel-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 7px;
+  color: #88aadd;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  line-height: 1.8;
+}
+
+.checkbox-row,
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 7px;
+  line-height: 2.2;
+  padding: 2px 0;
+  color: #ccddbb;
+}
+
+.checkbox-row:hover,
+.radio-row:hover {
+  color: #ffffff;
+}
+
+.checkbox-row input,
+.radio-row input {
+  accent-color: #66aaff;
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.control-row {
+  margin: 4px 0;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 6px;
+  line-height: 2.2;
+  color: #aabbcc;
+  margin: 4px 0;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  height: 4px;
+  accent-color: #66aaff;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+.label-small {
+  font-size: 6px;
+  color: #88aacc;
+  line-height: 2.0;
+  margin-top: 2px;
+}
+
+.panel-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #334466;
+  text-align: center;
+}
+
+/* ── Pixel button ── */
+.pixel-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  background: rgba(20, 30, 60, 0.9);
+  color: #aaddff;
+  border: 2px solid #4466aa;
+  padding: 5px 8px;
+  cursor: pointer;
+  image-rendering: pixelated;
+  line-height: 1.8;
+  letter-spacing: 0.5px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.pixel-btn:hover {
+  background: rgba(40, 60, 120, 0.9);
+  color: #ffffff;
+  border-color: #88aaff;
+}
+
+.pixel-btn:active {
+  background: rgba(60, 90, 180, 0.9);
+}
+
+/* ── Lore caption ── */
+#lore-caption {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(10, 10, 30, 0.85);
+  border: 2px solid #4466aa;
+  padding: 8px 14px;
+  max-width: 560px;
+  width: calc(100vw - 40px);
+  font-size: 7px;
+  color: #88aacc;
+  line-height: 2.0;
+  text-align: center;
+  image-rendering: pixelated;
+}
+
+/* ── Modal ── */
+#modal-about {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 5, 20, 0.80);
+}
+
+#modal-box {
+  background: rgba(10, 12, 30, 0.97);
+  border: 3px solid #4466aa;
+  padding: 20px;
+  max-width: 580px;
+  width: calc(100vw - 40px);
+  max-height: 85vh;
+  overflow-y: auto;
+  font-size: 7px;
+  line-height: 2.2;
+  color: #ccddbb;
+}
+
+.modal-title {
+  font-size: 10px;
+  color: #ffdd66;
+  margin-bottom: 12px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.modal-table-title {
+  font-size: 7px;
+  color: #88aadd;
+  margin: 14px 0 6px;
+  letter-spacing: 1px;
+}
+
+.lore-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+}
+
+.lore-table td {
+  padding: 4px 6px;
+  border: 1px solid #334466;
+  font-size: 6px;
+  line-height: 2.0;
+  color: #aabbcc;
+}
+
+.lore-table tr:nth-child(even) td {
+  background: rgba(40, 60, 100, 0.2);
+}
+
+#modal-box p {
+  margin: 6px 0;
+  font-size: 6px;
+  line-height: 2.2;
+  color: #99aabb;
+}
+
+#modal-close {
+  display: block;
+  margin: 16px auto 0;
+}
+
+/* ── Scrollbar styling ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 10, 30, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: #334466;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4466aa;
+}
