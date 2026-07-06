@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { CONSTANTS } from './sim.js';
-import { makeMoonPhaseTextures } from './textures.js';
+import { CONSTANTS, eclipseAlignmentFactor } from './sim.js';
+import { makeMoonPhaseTextures, makeTwilightTexture, makeAuroraTexture, makeSparkleTexture } from './textures.js';
 
 export function buildSky(scene) {
   // ── Star Wheel ──────────────────────────────────────────────────────────────
@@ -133,6 +133,84 @@ export function buildSky(scene) {
   shadowObjGroup.visible = false;
   scene.add(shadowObjGroup);
 
+  // ── Twilight Ring ────────────────────────────────────────────────────────────
+  // Soft warm-orange halo at the sun's ground point, sitting just outside the
+  // bright day patch. Plane footprint ≈ 6.5 units → orange band at r≈2.0–2.6.
+  const twilightTex = makeTwilightTexture();
+  const twilightMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(6.5, 6.5),
+    new THREE.MeshBasicMaterial({
+      map: twilightTex,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  twilightMesh.rotation.x = -Math.PI / 2;
+  twilightMesh.position.y = 0.16;
+  scene.add(twilightMesh);
+
+  // ── Aurora Curtains ──────────────────────────────────────────────────────────
+  // 8 planes evenly spaced around the disc rim (radius ≈ 9.85), facing inward,
+  // each with its own material clone so we can scroll offset independently.
+  const auroraBaseTex = makeAuroraTexture();
+  const auroraGroup = new THREE.Group();
+  const AURORA_COUNT = 8;
+  const AURORA_RADIUS = 9.85;
+  const auroraPlanes = [];
+
+  for (let i = 0; i < AURORA_COUNT; i++) {
+    const angle = (i / AURORA_COUNT) * Math.PI * 2;
+    const mat = new THREE.MeshBasicMaterial({
+      map: auroraBaseTex.clone(),
+      transparent: true,
+      opacity: 0.28,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    // Each clone needs its own offset instance
+    mat.map.needsUpdate = true;
+
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 0.9),
+      mat
+    );
+    // Position at rim, face inward (tangential)
+    mesh.position.set(
+      Math.cos(angle) * AURORA_RADIUS,
+      0.45 + 0.9 / 2, // base just above ice wall top
+      Math.sin(angle) * AURORA_RADIUS
+    );
+    mesh.rotation.y = -angle + Math.PI / 2; // face tangentially toward center
+
+    // Per-plane speed and base tilt for sway
+    mesh.userData.speed = 0.02 + (i % 4) * 0.0075;
+    mesh.userData.baseTilt = (i % 3 - 1) * 0.08; // slight random tilt
+    auroraPlanes.push(mesh);
+    auroraGroup.add(mesh);
+  }
+  scene.add(auroraGroup);
+
+  // ── Sun Glitter Shimmer ──────────────────────────────────────────────────────
+  // Sparkle dot field scrolled across the day patch for a glittery water sheen.
+  const sparkleTex = makeSparkleTexture();
+  sparkleTex.repeat.set(6, 6);
+  const glitterMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(2.2, 32),
+    new THREE.MeshBasicMaterial({
+      map: sparkleTex,
+      transparent: true,
+      opacity: 0.12,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  glitterMesh.rotation.x = -Math.PI / 2;
+  glitterMesh.position.y = 0.155;
+  scene.add(glitterMesh);
+
   // ── Planets (Tychonic epicycles) ─────────────────────────────────────────────
   const planetGroups = CONSTANTS.PLANETS.map(p => {
     const geo = new THREE.SphereGeometry(p.size, 6, 4);
@@ -143,6 +221,10 @@ export function buildSky(scene) {
     scene.add(group);
     return { group, mesh, config: p };
   });
+
+  // Store star layer base opacities for day/night dimming (read once at build)
+  const starLayers = starGroup.children; // Points objects
+  const starBaseOpacities = starLayers.map(p => p.material.opacity);
 
   return {
     sunGroup,
@@ -155,13 +237,21 @@ export function buildSky(scene) {
     moonFrames,
     shadowObjGroup,
     starGroup,
+    starLayers,
+    starBaseOpacities,
     planetGroups,
+    twilightMesh,
+    auroraGroup,
+    auroraPlanes,
+    glitterMesh,
   };
 }
 
 export function updateSky(sky, clock, toggles) {
   const { sunGroup, sunLight, sunBeamGroup, moonGroup, moonLight,
-          starGroup, shadowObjGroup, planetGroups, moonMat, moonFrames } = sky;
+          starGroup, starLayers, starBaseOpacities,
+          shadowObjGroup, planetGroups, moonMat, moonFrames,
+          twilightMesh, auroraGroup, auroraPlanes, glitterMesh } = sky;
 
   // Sun position
   const sx = clock.sunX, sz = clock.sunZ, sy = CONSTANTS.SUN_ALTITUDE;
@@ -190,14 +280,50 @@ export function updateSky(sky, clock, toggles) {
     moonMat.needsUpdate = true;
   }
 
+  // ── Blood-moon eclipse tint ────────────────────────────────────────────────
+  // eclipseAlignmentFactor returns 0..1; tint is always computed (visible regardless
+  // of shadowObject toggle — the moon reddens "mysteriously" unless you show the Shadow
+  // Object to see why). moonLight dims to ~15% at full eclipse.
+  {
+    const ef = eclipseAlignmentFactor(clock);
+    // Lerp moon material color: white (0xffffff) → blood red (0xcc4433)
+    const r = 1.0;
+    const g = 1.0 - ef * (1.0 - 0x44 / 0xff); // 1 → 0x44/0xff
+    const b = 1.0 - ef * (1.0 - 0x33 / 0xff); // 1 → 0x33/0xff
+    moonMat.color.setRGB(r, g, b);
+    // Moonlight: full intensity 55, dims to ~8 (15%) at peak eclipse
+    moonLight.intensity = 55 * (1 - ef * 0.85);
+  }
+
   // Stars rotate sidereal
   starGroup.rotation.y = -clock.starAngle;
 
-  // Shadow object
-  shadowObjGroup.visible = toggles.shadowObject;
-  if (toggles.shadowObject) {
+  // Shadow object — always position it (eclipseAlignmentFactor uses it); only render when toggled
+  {
     const sp = clock.shadowObjectPosition(sx, sz);
     shadowObjGroup.position.set(sp.x, sp.y, sp.z);
+  }
+  shadowObjGroup.visible = toggles.shadowObject;
+
+  // ── Twilight ring — follow sun ground point ──────────────────────────────────
+  twilightMesh.position.x = sx;
+  twilightMesh.position.z = sz;
+
+  // ── Glitter shimmer — follow sun ground point, scroll offset ─────────────────
+  glitterMesh.position.x = sx;
+  glitterMesh.position.z = sz;
+  glitterMesh.material.map.offset.x = (clock.simTime * 0.11) % 1;
+  glitterMesh.material.map.offset.y = (clock.simTime * 0.07) % 1;
+  glitterMesh.material.map.needsUpdate = true;
+
+  // ── Aurora curtains — scroll texture + sway ───────────────────────────────
+  auroraGroup.visible = (toggles.aurora !== false);
+  if (auroraGroup.visible) {
+    auroraPlanes.forEach((plane, i) => {
+      plane.material.map.offset.x = (clock.simTime * plane.userData.speed) % 1;
+      plane.material.map.needsUpdate = true;
+      plane.rotation.z = plane.userData.baseTilt + Math.sin(clock.simTime * 0.8 + i) * 0.05;
+    });
   }
 
   // Planets (Tychonic epicycles)

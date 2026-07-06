@@ -54,6 +54,7 @@ Always serve from HTTP. `file://` blocks ES module imports. The importmap in `in
 - No bundler, no framework, no npm. Plain ES modules.
 - All textures are procedural Canvas 2D — no binary image assets except the font (`assets/PressStart2P.ttf`).
 - **All lore values live in `CONSTANTS` in `js/sim.js`** with source comments. Change lore there, not in scene code.
+- **Map projection is true azimuthal equidistant**: `radius_px = (90 − lat) / 180 × 220` on the 512px canvas — north pole at canvas center, south pole at the ice-ring inner edge (r=220px). `latLonToDisc()` in `js/sim.js` and `makeWorldMapTexture()` in `js/textures.js` must stay in lockstep; anything placed by lat/lon (routes, observers) goes through `latLonToDisc()`.
 - Importmap in `index.html` wires the module specifiers to `vendor/`.
 - `vendor/` is intentionally committed (pinned three.js 0.180.0, no CDN dependency).
 
@@ -65,6 +66,8 @@ Always serve from HTTP. `file://` blocks ES module imports. The importmap in `in
 | `js/sim.js` | Wall clock, orbital math, CONSTANTS (all lore values) |
 | `js/world.js` | Disc, ice wall, four edge variants |
 | `js/sky.js` | Sun, moon, stars, dome, planets, Shadow Object |
+| `js/overlays.js` | Flight routes + observer pins on the AE map; distance/solar-time DOM boxes |
+| `js/audio.js` | Procedural WebAudio: wind, firmament pad, waterfall crossfade (no audio files) |
 | `js/textures.js` | Procedural Canvas 2D textures |
 | `js/ui.js` | Right-panel controls; reads/writes sim state |
 | `smoke-test.html` | Headless render + framebuffer health check |

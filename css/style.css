@@ -18,11 +18,22 @@ body {
   image-rendering: pixelated;
 }
 
+/* ── Sky tint — warm dawn gradient shown when camera faces toward sun ── */
+#sky-tint {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(180deg, #2a3a6a 0%, #7a5a4a 50%, #c8845a 100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
 #canvas {
   position: fixed;
   top: 0; left: 0;
   width: 100%; height: 100%;
   display: block;
+  z-index: 1;
 }
 
 /* ── Title block ── */
@@ -137,10 +148,6 @@ body {
   height: 12px;
   cursor: pointer;
   flex-shrink: 0;
-}
-
-.control-row {
-  margin: 4px 0;
 }
 
 .slider-row {
@@ -288,6 +295,85 @@ body {
   margin: 16px auto 0;
 }
 
+/* ── Postcards / preset buttons ── */
+.postcards-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.preset-btn {
+  font-size: 6px;
+  padding: 4px 6px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── Reset all link (in About modal) ── */
+.reset-all-link {
+  color: #cc6655;
+  text-decoration: none;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  line-height: 2.0;
+}
+
+.reset-all-link:hover {
+  color: #ff8877;
+  text-decoration: underline;
+}
+
+/* ── Radio group row (view mode) ── */
+.radio-group-row {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+/* ── Control row multi-button spacing ── */
+.control-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 4px 0;
+}
+
+/* ── Photo mode ── */
+#photo-exit {
+  display: none;
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 50;
+  font-size: 6px;
+  color: rgba(180, 200, 220, 0.6);
+  font-family: 'Press Start 2P', monospace;
+  line-height: 2.2;
+  text-align: right;
+  pointer-events: auto;
+  cursor: pointer;
+  gap: 6px;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.photo-mode #photo-exit {
+  display: flex;
+}
+
+.photo-mode #title-block,
+.photo-mode #right-panel,
+.photo-mode #lore-caption,
+.photo-mode #btn-collapse,
+.photo-mode #observer-box,
+.photo-mode #routes-box {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
 /* ── Scrollbar styling ── */
 ::-webkit-scrollbar {
   width: 6px;
@@ -301,3 +387,55 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #4466aa;
 }
+
+/* ── Lore tooltip ── */
+#tooltip {
+  display: none;
+  position: fixed;
+  z-index: 50;
+  background: rgba(10, 10, 30, 0.95);
+  border: 1px solid #4466aa;
+  padding: 7px 10px;
+  max-width: 260px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  color: #88aacc;
+  line-height: 2.0;
+  pointer-events: none;
+  word-wrap: break-word;
+}
+
+/* ── Observer box ── */
+#observer-box {
+  position: fixed;
+  bottom: 80px;
+  left: 16px;
+  z-index: 10;
+  background: rgba(10, 10, 30, 0.85);
+  border: 2px solid #4466aa;
+  padding: 8px 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  color: #aaddbb;
+  line-height: 2.4;
+  white-space: pre;
+}
+
+/* ── Routes box (stacked above the observer box) ── */
+#routes-box {
+  position: fixed;
+  bottom: 152px;
+  left: 16px;
+  z-index: 10;
+  background: rgba(10, 10, 30, 0.85);
+  border: 2px solid #4466aa;
+  padding: 8px 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  color: #ccddee;
+  line-height: 2.4;
+  white-space: pre;
+}
+
+#routes-box .rb-flat { color: #ffdd44; }
+#routes-box .rb-real { color: #66e0e0; }

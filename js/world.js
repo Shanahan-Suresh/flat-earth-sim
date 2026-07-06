@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CONSTANTS } from './sim.js';
-import { makeWorldMapTexture, makeWaterfallTexture } from './textures.js';
+import { makeWorldMapTexture, makeWaterfallTexture, makeBipolarMapTexture } from './textures.js';
 
 export function buildWorld(scene) {
   // ── Disc ──────────────────────────────────────────────────────────────────
@@ -14,6 +14,8 @@ export function buildWorld(scene) {
     new THREE.MeshLambertMaterial({ map: worldMapTexture, flatShading: true }),     // 1: top cap
     new THREE.MeshLambertMaterial({ color: 0x4a3020, flatShading: true }),         // 2: bottom cap
   ];
+  const topMat = discMats[1];
+  let _bipolarTex = null;
   const disc = new THREE.Mesh(discGeo, discMats);
   disc.position.y = -0.15; // shift down so top face sits at y=0
   scene.add(disc);
@@ -236,6 +238,17 @@ export function buildWorld(scene) {
       waterfallGroup.visible = mode === 'waterfall';
       infiniteGroup.visible = mode === 'infinite';
       beyondGroup.visible = mode === 'beyond';
+    },
+
+    setModel(mode) {
+      // mode: 'monopole' | 'bipolar'
+      if (mode === 'bipolar') {
+        if (!_bipolarTex) _bipolarTex = makeBipolarMapTexture();
+        topMat.map = _bipolarTex;
+      } else {
+        topMat.map = worldMapTexture;
+      }
+      topMat.needsUpdate = true;
     },
   };
 }

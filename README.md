@@ -2,6 +2,8 @@
 
 *A cozy pixel-art simulation of the flat earth — exactly as its believers describe it. Not a debunk; a faithful render of the lore.*
 
+**▶ Live demo: [shanahan-suresh.github.io/flat-earth-sim](https://shanahan-suresh.github.io/flat-earth-sim/)**
+
 ![Default view](screenshots/default.png)
 
 Built with **Three.js 0.180.0 + RenderPixelatedPass** for a chunky pixel-diorama aesthetic. This is an earnest simulation, not a parody.
@@ -16,16 +18,46 @@ A real-time 3D diorama of the flat-earth consensus model as described by [TFES (
 - The moon is self-luminous and phases relative to the sun
 - Stars rotate on a sidereal wheel; Polaris is fixed at the apex
 - Planets follow Tychonic epicycles around the sun
-- A Shadow Object causes lunar eclipses
+- A Shadow Object causes lunar eclipses — and an eclipse finder jumps you to the next one
 - Four edge theories are selectable: Ice Wall, Edge Waterfall, Infinite Plane, Lands Beyond
+- Stand on the disc in Ground view and watch the sun shrink into the distance — it never sets, exactly as the model predicts
+
+---
+
+## What's new in v1.1
+
+- **True azimuthal-equidistant map** — the disc texture now uses the real AE projection (`radius = (90 − lat)/180`, south pole at the ice ring), so the continents sit where the lore says they should. Honest note: v1.0's map was eyeballed; the disc looks slightly different now, and correctly so.
+- **State persistence** — your session (toggles, time, camera, everything) is saved to `localStorage` and restored on reload. URL parameters always override. A *Reset all settings* link lives in the About modal.
+- **Shareable URLs** — the full sim state serializes to query parameters (see [URL Parameters](#url-parameters)); postcards write a shareable link into the address bar.
+- **✦ POSTCARDS** — five preset framings, one click each: *Midnight Sun*, *Falls at Dusk*, *December Rush*, *Beyond the Wall*, *Blood Moon*.
+- **Eclipse finder** — the **ECLIPSE ⏩** button (TIME section) solves for the next Shadow-Object lunar eclipse, jumps to two sim-hours before it at 0.5× speed, and switches the Shadow Object on. Watch the moon turn blood-red as the Shadow Object slides between sun and moon. Also reachable via `?eclipse=1`.
+- **Ground view** — LOOK section radio (Diorama / Ground): stand on the disc surface. In the flat model the sun never sets; it only shrinks into the distance. RESET CAM respects whichever view you're in.
+- **Day/night sky gradient** — a full-screen warm tint and star fading driven by where your camera faces relative to the sun.
+- **Twilight ring** — a warm orange band rings the sun's day patch.
+- **Aurora curtains** — eight additive light ribbons dance over the ice wall (THE HEAVENS ▸ Aurora).
+- **Sun glitter** — a sparkle patch glints on the ocean beneath the sun.
+- **Flight routes overlay** — four real southern/northern routes drawn straight on the AE map, with a distance box comparing flat-map distance to real airline distance (Sydney–Santiago: flat 13,728 mi vs real 7,060 mi in ~12.5 h — the model's most famous stretch).
+- **Sky observers** — KL / London / NYC pins on the disc with a live box showing each observer's local solar time and ☀/☾ day-night status.
+- **Bipolar model** — MODEL radio toggles a rival two-pole flat map. Route/observer overlays auto-disable (they're projected for the monopole map).
+- **Lore tooltips** — hover any control for two or three sentences of faithful lore, sourced like everything else.
+- **📷 Photo mode** — hides all UI; press **S** to save a PNG of the frame, **Esc** to exit.
+- **♪ Procedural audio** — wind and a low firmament pad, synthesized live with WebAudio (no audio files). Waterfall noise crossfades in on the Edge Waterfall mode. Default off.
 
 ---
 
 ## Screenshots
 
-| Default view | Edge Waterfall | December sun (large outer orbit) |
-|---|---|---|
-| ![Default](screenshots/default.png) | ![Edge Waterfall](screenshots/edge-waterfall.png) | ![December sun](screenshots/december-sun.png) |
+| Ground view — the sun that never sets | Flight routes & observers |
+|---|---|
+| ![Ground view](screenshots/ground-view.png) | ![Overlays](screenshots/overlays.png) |
+
+| Blood moon — the Shadow Object aligns | Bipolar model |
+|---|---|
+| ![Blood moon](screenshots/blood-moon.png) | ![Bipolar](screenshots/bipolar.png) |
+
+| Edge Waterfall | December sun (large outer orbit) |
+|---|---|
+| ![Edge Waterfall](screenshots/edge-waterfall.png) | ![December sun](screenshots/december-sun.png) |
 
 ---
 
@@ -53,38 +85,51 @@ Then open **http://localhost:8000**
 
 | Input | Action |
 |---|---|
-| Left-drag | Orbit camera |
-| Right-drag / two-finger | Pan |
-| Scroll | Zoom |
-| Idle 15 s | Auto-rotate resumes |
+| Left-drag | Orbit camera (look around, in Ground view) |
+| Right-drag / two-finger | Pan (Diorama only) |
+| Scroll | Zoom (Diorama only) |
+| Idle 15 s | Auto-rotate resumes (Diorama only) |
+| **S** | Save PNG (in Photo mode) |
+| **Esc** | Exit Photo mode |
 
 **Right panel:**
 
 | Section | Controls |
 |---|---|
-| **THE HEAVENS** | Toggle dome, clouds, sun beam, shadow object |
-| **THE EDGE** | Ice Wall / Edge Waterfall / Infinite Plane / Lands Beyond |
-| **TIME** | Pause, speed multiplier (0–20×), day-of-year scrubber |
-| **LOOK** | Pixel size (2–8 px), camera reset |
-| **?** | About modal with lore constants |
+| **★ THE HEAVENS** | Toggle dome, clouds, sun beam, shadow object, aurora; MODEL radio (Monopole / Bipolar) |
+| **◈ OVERLAYS** | Flight Routes (with flat-vs-real distance box), Observers (KL/LON/NYC pins + local solar time box) |
+| **◆ THE EDGE** | Ice Wall / Edge Waterfall / Infinite Plane / Lands Beyond |
+| **⏱ TIME** | Pause/Resume, **ECLIPSE ⏩** (jump to next Shadow-Object eclipse), speed (0–20×), day-of-year scrubber |
+| **◈ LOOK** | Pixel size (2–8 px), ♪ Sound toggle, Diorama / Ground view radio, RESET CAM, 📷 PHOTO |
+| **✦ POSTCARDS** | Midnight Sun · Falls at Dusk · December Rush · Beyond the Wall · Blood Moon |
+| **?** | About modal with lore constants + *Reset all settings* |
+
+Hover any control for its lore tooltip.
 
 ---
 
 ## URL Parameters
 
-Initial state can be set via query string — useful for sharing views and automated screenshots:
+Initial state can be set via query string — useful for sharing views and automated screenshots. Parameters always override saved (localStorage) state:
 
 | Param | Values | Meaning |
 |---|---|---|
 | `edge` | `icewall` \| `waterfall` \| `infinite` \| `beyond` | Edge mode |
 | `dome`, `clouds`, `beam`, `shadow` | `0` \| `1` | Toggle dome / clouds / sun beam / shadow object |
+| `aurora` | `0` \| `1` | Aurora curtains over the ice wall |
+| `routes` | `0` \| `1` | Flight routes overlay + distance box |
+| `observers` | `0` \| `1` | Observer pins + local solar time box |
+| `audio` | `0` \| `1` | Procedural sound (starts on first click/keypress — browser gesture rule) |
+| `view` | `diorama` \| `ground` | Camera mode |
+| `model` | `monopole` \| `bipolar` | Flat-earth map variant |
 | `day` | 0–364 | Day of year |
-| `time` | 0–24 | Time of day (hours) |
-| `speed` | number | Time multiplier (`0` = paused) |
+| `time` | 0–24 | Time of day (decimal hours, e.g. `21.7`) |
+| `speed` | 0–20 | Time multiplier (`0` = paused) |
 | `px` | 2–8 | Pixel size |
-| `cam` | `X,Y,Z` | Initial camera position |
+| `cam` | `X,Y,Z` | Camera position (in Ground view, overrides the default standing spot) |
+| `eclipse` | `1` | Action param: jump to the next Shadow-Object lunar eclipse (applied after all other state) |
 
-Example: `http://localhost:8000/?edge=waterfall&day=172&time=15&speed=0&cam=12,2,12`
+Example: `?day=191&time=21.7&shadow=1&speed=0` — a blood moon, paused.
 
 ---
 
@@ -93,6 +138,7 @@ Example: `http://localhost:8000/?edge=waterfall&day=172&time=15&speed=0&cam=12,2
 | Lore constant | Value |
 |---|---|
 | Disc radius | 12,450 mi (10 units; 1 unit = 1,245 mi) |
+| Map projection | Azimuthal equidistant — north pole at center, south pole at the ice ring |
 | Ice wall height | ~150 ft lore (exaggerated for visibility) |
 | Sun diameter | 32 mi (lore); upscaled ~13× for visibility |
 | Moon diameter | 32 mi (lore); self-luminous cold light |
@@ -114,26 +160,36 @@ The moon follows a similar path but advances at 347.81°/day, gaining on the sun
 
 Stars are fixed to a rotating wheel (sidereal day 23.93 h). Polaris sits at the apex and does not rotate.
 
+The eclipse finder scans forward through sim time for the next moment the Shadow Object crosses the sun–moon segment during a full moon — the same alignment math that drives the blood-red tint ramp.
+
 ### What the consensus actually says
 
 - **Water does NOT fall off.** The ice wall (lore: ~150 ft of Antarctic ice) contains the oceans. The "edge waterfall" is an outsider meme; the community explicitly disavows it (included here as a toggle, labeled as such).
 - **Gravity is replaced** by density & buoyancy + Universal Electromagnetic Acceleration (9.8 m/s² upward disc acceleration).
 - **The moon is self-luminous**, emitting its own cold light — not reflecting the sun. This is core TFES doctrine.
 - **Lunar eclipses** are caused by a dark "Shadow Object" — an invisible body orbiting the sun — not by the Earth's shadow (which would require a spherical Earth for the umbra geometry).
+- **The sun never sets** — it recedes. Ground view renders this faithfully: at "sunset" the flat-model sun simply shrinks toward the horizon while remaining above it.
+- **Southern flights** on the flat map stretch enormously and detour past the equator (see the routes overlay). Airlines fly Sydney–Santiago nonstop in ~12.5 h; the community's answer is that real routes are hidden by closed-cockpit navigation.
 - **Southern-hemisphere 24-hour daylight** is geometrically impossible in the flat-earth model. The community denies or disputes the data.
 - **Star rotation** in the southern hemisphere appears to circle a southern celestial pole — the community disputes or ignores this observation.
+- **The bipolar map** — two poles side by side — is a rival model among modern communities; even its advocates don't agree on how the sun should spiral over it, so this sim keeps the standard path.
 
 ---
 
 ## Architecture
 
 ```
-js/main.js        — renderer setup, EffectComposer, OrbitControls, animation loop
-js/sim.js         — wall clock, orbital math, CONSTANTS (all lore values live here)
-js/world.js       — disc geometry, ice wall, and all four edge variants
-js/sky.js         — sun, moon, stars, dome, planets, Shadow Object
+js/main.js        — renderer setup, EffectComposer, OrbitControls, animation loop,
+                    state capture/apply/serialize, localStorage persistence, view modes
+js/sim.js         — wall clock, orbital math, CONSTANTS (all lore values live here),
+                    eclipse finder, lat/lon → disc projection
+js/world.js       — disc geometry, ice wall, and all four edge variants; bipolar map swap
+js/sky.js         — sun, moon, stars, dome, planets, Shadow Object, aurora, twilight ring,
+                    sun glitter, blood-moon tint
+js/overlays.js    — flight routes + observer pins on the AE map; distance & solar-time boxes
+js/audio.js       — procedural WebAudio: wind, firmament pad, waterfall crossfade
 js/textures.js    — all textures procedural via Canvas 2D (no binary image assets)
-js/ui.js          — right-panel HTML controls; reads/writes sim state
+js/ui.js          — right-panel HTML controls, postcards, lore tooltips, photo mode
 
 vendor/           — pinned Three.js 0.180.0 (intentionally committed, no CDN)
   three.module.js — re-exports from three.core.js (both files required)
@@ -178,4 +234,5 @@ Three.js ≥ r167 is a **split build**: `three.module.js` re-exports from `three
 - Wikipedia: "Modern flat Earth beliefs"
 - NCSE: "The Rim at the End of the World"
 - Blake Marnell: *Flat Earth Sun, Moon & Zodiac Clock* app
-- Samuel Rowbotham: *Zetetic Astronomy: Earth Not a Globe* (1865)
+- Samuel Rowbotham: *Zetetic Astronomy: Earth Not a Globe* (1865) — the firmament, the receding sun, the ice barrier
+- Orlando Ferguson: *Map of the Square and Stationary Earth* (1893) — early systematic monopole map

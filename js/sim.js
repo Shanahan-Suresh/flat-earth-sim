@@ -49,6 +49,17 @@ export const CONSTANTS = {
     { name: 'Mars',    color: 0xFF5533, size: 0.08, orbitRadius: 0.80, period: 2.8  },
     { name: 'Jupiter', color: 0xDDCCAA, size: 0.12, orbitRadius: 1.05, period: 4.5  },
   ],
+
+  // Eclipse detection tolerances
+  // Full-moon angular error (rad): sun-moon opposition must be within this of π.
+  // Relative angular speed ~0.0089 rad/h; 0.15 rad gives a ~17 sim-hour full-moon window
+  // centered on opposition — wide enough to overlap the Shadow Object's ~3 sim-hour
+  // close-approach window and give a strong visual peak (ef ≈ 0.97 at center).
+  FULL_MOON_TOL: 0.15,
+  // Shadow Object point-to-segment distance (scene units) from sun-moon line segment.
+  // At 0.6 units the tint window is ~3 sim-hours and peak color is deep red (#ff4a39).
+  // Eclipse cadence ~20-30 sim-days — reliable finder within 400 days from any start.
+  ECLIPSE_ALIGN_TOL: 0.6,
 };
 
 export class SimClock {
@@ -145,4 +156,109 @@ export class SimClock {
     if (day < 266) return 'Summer';
     return 'Autumn';
   }
+}
+
+// ── Eclipse math ──────────────────────────────────────────────────────────────
+
+function _normalizeAngle(a) {
+  const TWO_PI = Math.PI * 2;
+  return ((a % TWO_PI) + TWO_PI) % TWO_PI;
+}
+
+function _pointToSegmentDist(px, py, pz, ax, ay, az, bx, by, bz) {
+  const abx = bx - ax, aby = by - ay, abz = bz - az;
+  const apx = px - ax, apy = py - ay, apz = pz - az;
+  const ab2 = abx * abx + aby * aby + abz * abz;
+  if (ab2 === 0) return Math.sqrt(apx * apx + apy * apy + apz * apz);
+  const t = Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / ab2));
+  const cx = ax + t * abx, cy = ay + t * aby, cz = az + t * abz;
+  const dx = px - cx, dy = py - cy, dz = pz - cz;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+// Scratch-step a temporary clock computation (no real SimClock mutation) to find the
+// next simTime when the Shadow Object aligns on the sun-moon segment during a full moon.
+// Returns simTime (number) or null if none found within 400 sim-days.
+export function findNextLunarEclipse(fromSimTime) {
+  const step = 0.05;
+  const cap = fromSimTime + 400 * 24;
+
+  // Inline the same math as SimClock getters, without constructing a real clock.
+  function sunAngleAt(t) { return ((t % 24) / 24) * 2 * Math.PI; }
+  function moonAngleAt(t) { return ((t * CONSTANTS.MOON_RATE_RATIO) / 24) * 2 * Math.PI; }
+  function dayAt(t) { return Math.floor(t / 24) % 365; }
+  function sunPathRadiusAt(t) {
+    const d = dayAt(t);
+    const dec = (CONSTANTS.SUN_DECLINATION_AMP * Math.PI / 180) * Math.cos(2 * Math.PI * (d - 172) / 365);
+    const normDec = dec / (CONSTANTS.SUN_DECLINATION_AMP * Math.PI / 180);
+    return CONSTANTS.SUN_PATH_BASE - normDec * CONSTANTS.SUN_PATH_RANGE;
+  }
+  function moonPathRadiusAt(t) {
+    const d = dayAt(t);
+    return CONSTANTS.SUN_PATH_BASE
+      - CONSTANTS.SUN_PATH_RANGE * Math.cos(2 * Math.PI * (d - 172) / 365 + CONSTANTS.MOON_PATH_PHASE_OFFSET);
+  }
+
+  for (let t = fromSimTime + 0.5; t < cap; t += step) {
+    const sa = sunAngleAt(t);
+    const ma = moonAngleAt(t);
+    const phaseDiff = _normalizeAngle(sa - ma);
+    if (Math.abs(phaseDiff - Math.PI) >= CONSTANTS.FULL_MOON_TOL) continue;
+
+    const r = sunPathRadiusAt(t);
+    const sx = r * Math.cos(-sa), sz = r * Math.sin(-sa);
+    const sy = CONSTANTS.SUN_ALTITUDE;
+
+    const mr = moonPathRadiusAt(t);
+    const mx = mr * Math.cos(-ma), mz = mr * Math.sin(-ma);
+    const my = CONSTANTS.MOON_ALTITUDE;
+
+    const a = (t / 24 / CONSTANTS.SHADOW_OBJECT_PERIOD) * 2 * Math.PI;
+    const bob = Math.sin(a * 5) * 0.3;
+    const spx = sx + CONSTANTS.SHADOW_OBJECT_ORBIT_RADIUS * Math.cos(a);
+    const spy = CONSTANTS.SUN_ALTITUDE + bob;
+    const spz = sz + CONSTANTS.SHADOW_OBJECT_ORBIT_RADIUS * Math.sin(a);
+
+    const dist = _pointToSegmentDist(spx, spy, spz, sx, sy, sz, mx, my, mz);
+    if (dist < CONSTANTS.ECLIPSE_ALIGN_TOL) return t;
+  }
+  return null;
+}
+
+// Continuous eclipse alignment factor (0..1): 1 = dead-center eclipse, 0 = no eclipse.
+// Product of smoothstep on full-moon angular error and shadow-object segment distance.
+// Drives the blood-moon tint ramp regardless of whether shadowObject is visible.
+export function eclipseAlignmentFactor(clock) {
+  const sa = clock.sunAngle;
+  const ma = clock.moonAngle;
+  const phaseDiff = _normalizeAngle(sa - ma);
+  const fmErr = Math.abs(phaseDiff - Math.PI);
+
+  const sx = clock.sunX, sz = clock.sunZ, sy = CONSTANTS.SUN_ALTITUDE;
+  const mx = clock.moonX, mz = clock.moonZ, my = CONSTANTS.MOON_ALTITUDE;
+  const sp = clock.shadowObjectPosition(sx, sz);
+  const dist = _pointToSegmentDist(sp.x, sp.y, sp.z, sx, sy, sz, mx, my, mz);
+
+  function smoothstep(x) {
+    x = Math.max(0, Math.min(1, x));
+    return x * x * (3 - 2 * x);
+  }
+
+  const fmFactor  = 1 - smoothstep(fmErr / CONSTANTS.FULL_MOON_TOL);
+  const segFactor = 1 - smoothstep(dist  / CONSTANTS.ECLIPSE_ALIGN_TOL);
+  return fmFactor * segFactor;
+}
+
+export function latLonToDisc(lat, lon) {
+  // Azimuthal equidistant, matching makeWorldMapTexture's latLonToPixel:
+  // north pole (lat 90) at disc center, south pole (lat -90) at the inner
+  // ice-ring edge (220px on the 512px canvas). Canvas 256px half-width maps
+  // to the 10-unit disc radius, so scale = 10/256 world units per pixel.
+  const radius_px = (90 - lat) / 180 * 220;
+  const lonRad = lon * Math.PI / 180;
+  const scale = 10 / 256; // world units per canvas pixel
+  return {
+    x: radius_px * Math.sin(lonRad) * scale,
+    z: -(radius_px * Math.cos(lonRad) * scale),
+  };
 }

@@ -16,6 +16,9 @@
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
+  <!-- Sky tint overlay — JS drives opacity for day/night warm gradient -->
+  <div id="sky-tint"></div>
+
   <!-- Canvas background -->
   <canvas id="canvas"></canvas>
 
@@ -51,6 +54,33 @@
         <input type="checkbox" id="chk-shadow">
         <span>Shadow Object</span>
       </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-aurora" checked>
+        <span>Aurora</span>
+      </label>
+      <div class="label-small" style="margin-top:6px;">MODEL</div>
+      <div class="radio-group-row">
+        <label class="radio-row">
+          <input type="radio" name="model" id="model-monopole" value="monopole" checked>
+          <span>Monopole</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="model" id="model-bipolar" value="bipolar">
+          <span>Bipolar</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ OVERLAYS</div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-routes">
+        <span>Flight Routes</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-observers">
+        <span>Observers</span>
+      </label>
     </div>
 
     <div class="panel-section">
@@ -77,6 +107,7 @@
       <div class="section-title">⏱ TIME</div>
       <div class="control-row">
         <button id="btn-pause" class="pixel-btn">⏸ PAUSE</button>
+        <button id="btn-next-eclipse" class="pixel-btn">ECLIPSE ⏩</button>
       </div>
       <div class="slider-row">
         <span>Speed</span>
@@ -97,9 +128,29 @@
         <input type="range" id="slider-pixel" min="2" max="8" value="4" step="1">
         <span id="label-pixel">4</span>
       </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-audio">
+        <span>♪ Sound</span>
+      </label>
+      <div class="radio-group-row">
+        <label class="radio-row">
+          <input type="radio" name="view" id="view-diorama" value="diorama" checked>
+          <span>Diorama</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="view" id="view-ground" value="ground">
+          <span>Ground</span>
+        </label>
+      </div>
       <div class="control-row">
         <button id="btn-reset-cam" class="pixel-btn">↺ RESET CAM</button>
+        <button id="btn-photo" class="pixel-btn">📷 PHOTO</button>
       </div>
+    </div>
+
+    <div id="section-postcards" class="panel-section">
+      <div class="section-title">✦ POSTCARDS</div>
+      <div id="postcards-wrap" class="postcards-wrap"></div>
     </div>
 
     <div class="panel-footer">
@@ -107,10 +158,25 @@
     </div>
   </div>
 
+  <!-- Flight route distances box (bottom-left, above observer box, visible when routes on) -->
+  <div id="routes-box" style="display:none;"></div>
+
+  <!-- Observer local time box (bottom-left, visible when observers on) -->
+  <div id="observer-box" style="display:none;"></div>
+
+  <!-- Photo mode exit hint (only visible in photo-mode) -->
+  <div id="photo-exit">
+    📷 <span>S = save</span> · <span>Esc = exit</span>
+    <button id="btn-save-png" class="pixel-btn">SAVE PNG</button>
+  </div>
+
   <!-- Lore caption bar -->
   <div id="lore-caption">
     Consensus: a 150-ft Antarctic ice wall rings the disc and holds the oceans in — nothing falls off.
   </div>
+
+  <!-- Lore tooltip (shown on hover over panel rows, desktop only) -->
+  <div id="tooltip"></div>
 
   <!-- About modal -->
   <div id="modal-about" style="display:none;">
@@ -140,6 +206,9 @@
 
       <div class="modal-table-title">TECH</div>
       <p>Three.js 0.180.0 vendored · RenderPixelatedPass · All art procedural · Press Start 2P font (OFL) · Run: python -m http.server 8000</p>
+
+      <div class="modal-table-title">SETTINGS</div>
+      <p><a id="btn-reset-all" href="#" class="reset-all-link">RESET ALL SETTINGS</a> — clears saved state and reloads with defaults.</p>
 
       <button id="modal-close" class="pixel-btn">✕ CLOSE</button>
     </div>
