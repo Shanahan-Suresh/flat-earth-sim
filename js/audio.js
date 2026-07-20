@@ -1,6 +1,7 @@
 // js/audio.js — procedural ambient audio engine for flat-earth-sim
 // No binary assets. All sound is synthesized via WebAudio API.
-// Public API: initAudio(), setAudioEnabled(bool), setEdgeMode(mode), setDayFactor(f)
+// Public API: initAudio(), setAudioEnabled(bool), setEdgeMode(mode), setDayFactor(f),
+//             setRainIntensity(f), setEdgeProximity(p)
 
 let _ctx = null;          // AudioContext (created lazily on user gesture)
 let _masterGain = null;   // master gain → destination
@@ -10,6 +11,9 @@ let _enabled = false;
 let _windGain      = null;
 let _waterfallGain = null;
 let _padGain       = null;
+let _rainGain      = null;
+let _cricketVCA    = null; // amplitude texture VCA (tremolo + gate)
+let _cricketLevel  = null; // master swell (night audible, day silent)
 
 // Filter refs for dayFactor modulation
 let _windFilter      = null;
@@ -23,6 +27,19 @@ let _padLFOGain    = null; // scales pad filter freq ±200 Hz
 let _graphBuilt = false;
 let _currentEdge = 'icewall';
 let _lastDayFactor = -1;
+
+// Dawn/dusk birds — scheduled one-shots, active only inside the twilight band
+let _birdsActive = false;
+let _birdTimer = null;
+
+// Foghorn — edge + proximity gated, scheduled recurring one-shots
+let _edgeProximity = 0;
+let _foghornTimer = null;
+
+function _smoothstep(x) {
+  x = Math.max(0, Math.min(1, x));
+  return x * x * (3 - 2 * x);
+}
 
 // ── Brown-noise buffer generator ─────────────────────────────────────────────
 function makeBrownNoiseBuffer(ctx, durationSec) {
@@ -167,8 +184,144 @@ function buildGraph() {
 
   padLFO.start(now);
 
+  // ── 4. RAIN layer ──────────────────────────────────────────────────────────
+  const rainBuf = makeWhiteNoiseBuffer(ctx, 4);
+  const rainSrc = ctx.createBufferSource();
+  rainSrc.buffer = rainBuf;
+  rainSrc.loop = true;
+
+  const rainFilter = ctx.createBiquadFilter();
+  rainFilter.type = 'bandpass';
+  rainFilter.frequency.setValueAtTime(2200, now);
+  rainFilter.Q.setValueAtTime(0.6, now);
+
+  _rainGain = ctx.createGain();
+  _rainGain.gain.setValueAtTime(0, now); // off by default
+
+  rainSrc.connect(rainFilter);
+  rainFilter.connect(_rainGain);
+  _rainGain.connect(_masterGain);
+
+  rainSrc.start(now);
+
+  // ── 5. CRICKETS layer ─────────────────────────────────────────────────────
+  const cricketOsc = ctx.createOscillator();
+  cricketOsc.type = 'sine';
+  cricketOsc.frequency.setValueAtTime(4300, now);
+
+  const cricketFilter = ctx.createBiquadFilter();
+  cricketFilter.type = 'bandpass';
+  cricketFilter.frequency.setValueAtTime(4300, now);
+  cricketFilter.Q.setValueAtTime(6, now);
+
+  _cricketVCA = ctx.createGain();
+  _cricketVCA.gain.setValueAtTime(0.5, now);
+
+  _cricketLevel = ctx.createGain();
+  _cricketLevel.gain.setValueAtTime(0, now); // swell driven by setDayFactor
+
+  cricketOsc.connect(cricketFilter);
+  cricketFilter.connect(_cricketVCA);
+  _cricketVCA.connect(_cricketLevel);
+  _cricketLevel.connect(_masterGain);
+
+  // Fast tremolo LFO
+  const cricketTremolo = ctx.createOscillator();
+  cricketTremolo.type = 'sine';
+  cricketTremolo.frequency.setValueAtTime(24, now);
+  const cricketTremoloDepth = ctx.createGain();
+  cricketTremoloDepth.gain.setValueAtTime(0.4, now);
+  cricketTremolo.connect(cricketTremoloDepth);
+  cricketTremoloDepth.connect(_cricketVCA.gain);
+
+  // Slow gate LFO
+  const cricketGate = ctx.createOscillator();
+  cricketGate.type = 'sine';
+  cricketGate.frequency.setValueAtTime(0.9, now);
+  const cricketGateDepth = ctx.createGain();
+  cricketGateDepth.gain.setValueAtTime(0.4, now);
+  cricketGate.connect(cricketGateDepth);
+  cricketGateDepth.connect(_cricketVCA.gain);
+
+  cricketOsc.start(now);
+  cricketTremolo.start(now);
+  cricketGate.start(now);
+
+  // ── 6. FOGHORN scheduler (started once; gates itself each firing) ────────
+  _scheduleFoghorn();
+
   // Apply current edge mode now that graph is built
   _applyEdgeMode(_currentEdge, true);
+}
+
+// ── Internal: dawn/dusk bird chirp scheduler ─────────────────────────────────
+function _scheduleBird() {
+  if (!_birdsActive || !_enabled || !_ctx) return;
+
+  const ctx = _ctx;
+  const now = ctx.currentTime;
+  const repeats = 2 + Math.floor(Math.random() * 2); // 2–3 quick chirps
+
+  for (let i = 0; i < repeats; i++) {
+    const t = now + i * 0.14;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(2800, t);
+    osc.frequency.linearRampToValueAtTime(3400, t + 0.12);
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.12, t + 0.015);
+    env.gain.linearRampToValueAtTime(0, t + 0.15);
+
+    osc.connect(env);
+    env.connect(_masterGain);
+
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
+
+  _birdTimer = setTimeout(_scheduleBird, 2000 + Math.random() * 5000);
+}
+
+// ── Internal: foghorn scheduler (recurring; gates on fire) ───────────────────
+function _scheduleFoghorn() {
+  _foghornTimer = setTimeout(_scheduleFoghorn, 45000 + Math.random() * 75000);
+
+  if (!_enabled || _edgeProximity <= 0.75 || _currentEdge !== 'icewall') return;
+  if (!_ctx || !_masterGain) return;
+
+  const ctx = _ctx;
+  const now = ctx.currentTime;
+
+  const hornFilter = ctx.createBiquadFilter();
+  hornFilter.type = 'lowpass';
+  hornFilter.frequency.setValueAtTime(200, now);
+
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0, now);
+  env.gain.linearRampToValueAtTime(0.22, now + 1.2);
+  env.gain.setValueAtTime(0.22, now + 2.5);
+  env.gain.linearRampToValueAtTime(0, now + 4.0);
+
+  const osc = ctx.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(65, now);
+
+  const subOsc = ctx.createOscillator();
+  subOsc.type = 'sine';
+  subOsc.frequency.setValueAtTime(32.5, now);
+
+  osc.connect(hornFilter);
+  subOsc.connect(hornFilter);
+  hornFilter.connect(env);
+  env.connect(_masterGain);
+
+  osc.start(now);
+  subOsc.start(now);
+  osc.stop(now + 4.2);
+  subOsc.stop(now + 4.2);
 }
 
 // ── Public: initAudio ─────────────────────────────────────────────────────────
@@ -221,12 +374,28 @@ export function setEdgeMode(mode) {
   _applyEdgeMode(mode, false);
 }
 
+// ── Public: setRainIntensity ──────────────────────────────────────────────────
+// f ∈ [0,1]; 1 = camera at/near a rain cell center, 0 = no rain nearby.
+export function setRainIntensity(f) {
+  if (!_graphBuilt) return;
+  const now = _ctx.currentTime;
+  const g = 0.18 * Math.max(0, Math.min(1, f));
+  _rainGain.gain.setTargetAtTime(g, now, 0.5);
+}
+
+// ── Public: setEdgeProximity ──────────────────────────────────────────────────
+// p ∈ [0,1]; how close the camera is to the disc edge. Gates the foghorn.
+export function setEdgeProximity(p) {
+  _edgeProximity = Math.max(0, Math.min(1, p));
+}
+
 // ── Public: setDayFactor ──────────────────────────────────────────────────────
 // f ∈ [0,1]; 0=night, 1=day facing camera.
 // Wind lowpass: 350→500 Hz, Pad filter: base ±50 Hz brightness shift.
 export function setDayFactor(f) {
   if (!_graphBuilt) return;
   if (Math.abs(f - _lastDayFactor) < 0.01) return; // throttle
+  const prevF = _lastDayFactor;
   _lastDayFactor = f;
 
   const now = _ctx.currentTime;
@@ -239,4 +408,19 @@ export function setDayFactor(f) {
   // Pad filter base: 750 Hz (night) → 850 Hz (day), LFO sweeps around that
   const padBase = 750 + f * 100;
   _padFilter.frequency.setTargetAtTime(padBase, now, τ);
+
+  // Crickets: swell in at night (f<0.30), silent by day
+  const cricketTarget = 0.10 * _smoothstep((0.30 - f) / 0.15);
+  _cricketLevel.gain.setTargetAtTime(cricketTarget, now, 1.5);
+
+  // Dawn/dusk birds: active only inside the twilight band (0.30, 0.65)
+  const bandNow = f > 0.30 && f < 0.65;
+  const bandPrev = prevF > 0.30 && prevF < 0.65;
+  if (bandNow && !bandPrev) {
+    _birdsActive = true;
+    _scheduleBird();
+  } else if (!bandNow && bandPrev) {
+    _birdsActive = false;
+    clearTimeout(_birdTimer);
+  }
 }

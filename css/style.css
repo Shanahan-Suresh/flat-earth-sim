@@ -175,6 +175,26 @@ body {
   margin-top: 2px;
 }
 
+/* ── Almanac ── */
+.almanac-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 6px;
+  line-height: 2.0;
+  color: #aabbcc;
+  margin: 4px 0;
+}
+.alm-label { flex-shrink: 0; width: 52px; color: #88aacc; }
+.alm-val { flex: 1; color: #cfe0ff; }
+.alm-btn { padding: 3px 5px; font-size: 7px; line-height: 1; }
+.alm-shower {
+  font-size: 6px;
+  color: #ffcc66;
+  line-height: 2.2;
+  margin-top: 4px;
+}
+
 .panel-footer {
   margin-top: 8px;
   padding-top: 8px;

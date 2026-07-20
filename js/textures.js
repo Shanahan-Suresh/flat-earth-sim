@@ -303,6 +303,112 @@ export function makeGlowSprite() {
   return applyNearestFilter(texture);
 }
 
+export function makePlaneTexture() {
+  // 16x16 chunky plane silhouette pointing +X, 1px dark outline, transparent bg.
+  const canvas = document.createElement('canvas');
+  canvas.width = 16;
+  canvas.height = 16;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 16, 16);
+
+  const outline = '#2c313d';
+  const body = '#e6ecf5';
+
+  const px = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); };
+
+  // Outline silhouette first (fuselage + wing/tail cross + nose taper)
+  px(1, 7, 14, 2, outline);
+  px(6, 3, 5, 10, outline);
+  px(12, 6, 3, 4, outline);
+
+  // Body fill inset ~1px where it reads clean
+  px(2, 7, 12, 1, body);
+  px(7, 4, 3, 8, body);
+  px(12, 7, 3, 1, body);
+
+  return canvas;
+}
+
+export function makeShipTexture() {
+  // 16x12 dark hull, small white superstructure, one orange stack pixel, transparent bg.
+  const canvas = document.createElement('canvas');
+  canvas.width = 16;
+  canvas.height = 12;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 16, 12);
+
+  const hullOutline = '#14181f';
+  const hull = '#3a4250';
+  const deck = '#e8ecf2';
+  const stack = '#d9772f';
+
+  ctx.fillStyle = hullOutline;
+  ctx.fillRect(1, 7, 14, 4);
+  ctx.fillStyle = hull;
+  ctx.fillRect(2, 7, 12, 3);
+
+  ctx.fillStyle = hullOutline;
+  ctx.fillRect(5, 4, 6, 4);
+  ctx.fillStyle = deck;
+  ctx.fillRect(6, 5, 4, 2);
+
+  ctx.fillStyle = stack;
+  ctx.fillRect(8, 3, 1, 2);
+
+  return canvas;
+}
+
+// ── Winter creep frost ring ────────────────────────────────────────────────────
+// Module-scoped 256x256 canvas reused across redraws (one frostMesh in the scene).
+let _frostCanvas = null;
+let _frostCtx = null;
+
+export function makeFrostTexture() {
+  if (!_frostCanvas) {
+    _frostCanvas = document.createElement('canvas');
+    _frostCanvas.width = 256;
+    _frostCanvas.height = 256;
+    _frostCtx = _frostCanvas.getContext('2d');
+    _frostCtx.imageSmoothingEnabled = false;
+  }
+  const texture = applyNearestFilter(new THREE.CanvasTexture(_frostCanvas));
+
+  // innerFrac: 0..1 fraction of the 128px texture radius that stays clear;
+  // beyond it ramps to pale blue-white frost toward the edge.
+  function redraw(innerFrac) {
+    const ctx = _frostCtx;
+    const cx = 128, cy = 128;
+    const innerR = Math.max(0, Math.min(1, innerFrac)) * 128;
+    ctx.clearRect(0, 0, 256, 256);
+
+    const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, 128);
+    grad.addColorStop(0, 'rgba(216,240,250,0)');
+    grad.addColorStop(1, 'rgba(216,240,250,0.9)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 128, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sparse 1-2px frost speckle grain in the frosted band
+    for (let i = 0; i < 60; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const rr = innerR + Math.random() * (128 - innerR);
+      const sx = cx + rr * Math.cos(a);
+      const sy = cy + rr * Math.sin(a);
+      const size = Math.random() < 0.5 ? 1 : 2;
+      ctx.fillStyle = 'rgba(240,250,255,0.85)';
+      ctx.fillRect(sx, sy, size, size);
+    }
+
+    texture.needsUpdate = true;
+  }
+
+  redraw(1.0);
+  return { texture, redraw };
+}
+
 export function makeBipolarMapTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 512;

@@ -60,6 +60,105 @@ export const CONSTANTS = {
   // At 0.6 units the tint window is ~3 sim-hours and peak color is deep red (#ff4a39).
   // Eclipse cadence ~20-30 sim-days — reliable finder within 400 days from any start.
   ECLIPSE_ALIGN_TOL: 0.6,
+
+  // Day patch radius (scene units): matches the sunBeam cone's base radius in sky.js.
+  // Anything inside this planar distance from the sun's ground point is "in daylight" —
+  // drives observer-box day/night icons and city-lights extinguishing.
+  DAY_PATCH_RADIUS: 2.6,
+
+  // City lights: 13 population centers lit by warm glow once outside the day patch.
+  // Observers (KL/LON/NYC) listed first to match the OVERLAYS observer pins.
+  CITY_LIGHTS: [
+    { name: 'KL', lat: 3.1, lon: 101.7 }, { name: 'LON', lat: 51.5, lon: -0.1 },
+    { name: 'NYC', lat: 40.7, lon: -74.0 }, { name: 'Tokyo', lat: 35.7, lon: 139.7 },
+    { name: 'Beijing', lat: 39.9, lon: 116.4 }, { name: 'Delhi', lat: 28.6, lon: 77.2 },
+    { name: 'Moscow', lat: 55.8, lon: 37.6 }, { name: 'Cairo', lat: 30.0, lon: 31.2 },
+    { name: 'Lagos', lat: 6.5, lon: 3.4 }, { name: 'Sao Paulo', lat: -23.6, lon: -46.6 },
+    { name: 'Buenos Aires', lat: -34.6, lon: -58.4 }, { name: 'Sydney', lat: -33.9, lon: 151.2 },
+    { name: 'Los Angeles', lat: 34.1, lon: -118.2 },
+  ],
+  // How far past DAY_PATCH_RADIUS (scene units) city lights ramp from off to full glow.
+  CITY_LIGHT_RAMP: 0.8,
+
+  // Air traffic: closed-cockpit long-hauls flying the flat map's true routes.
+  PLANE_TRIP_HOURS: 14,   // one-way sim-hours for a route leg
+  PLANE_ALTITUDE: 0.45,   // scene units above the disc
+  // Ship loops: slow ocean circuits, positioned/sized by lore-plausible open water.
+  SHIP_LOOPS: [
+    { lat: -10, lon: -140, r: 1.1, days: 6 },  // South Pacific
+    { lat: -30, lon: -20,  r: 0.9, days: 5 },  // South Atlantic
+    { lat: -10, lon:  85,  r: 0.8, days: 4 },  // Indian Ocean
+  ],
+
+  // Winter creep: a frost ring that grows toward the ice wall, peaking at the
+  // Dec 21 solstice (day 355) and thinning to a sliver by midsummer.
+  FROST_PEAK_DAY: 355,
+  FROST_INNER_MIN: 6.4,
+  FROST_INNER_MAX: 9.5,
+  FROST_MAX_OPACITY: 0.5,
+
+  // Shooting stars: spawn only on the night side of the camera view; showers
+  // are lore-named calendar events that multiply the base spawn rate.
+  METEOR_NIGHT_THRESHOLD: 0.35,
+  METEOR_BASE_RATE: 1 / 40,   // per real-second, at dayFactor below threshold
+  METEOR_DURATION: 0.9,       // real seconds per streak
+  METEOR_SHOWERS: [
+    { name: 'The Lanternfall',          day: 224, span: 3, mult: 8 },
+    { name: "The Wheelwright's Sparks", day: 349, span: 3, mult: 6 },
+    { name: 'The Dome-Menders',         day: 4,   span: 2, mult: 5 },
+  ],
+
+  // Constellations: lamps hung on the dome's underside, fixed in the star wheel.
+  // Each figure is { name, stars: [[azDeg, polarDeg], ...], segs: [[i,j], ...] }
+  // — polarDeg is angle from the dome apex (0 = apex/Polaris, ~85 = near rim).
+  CONSTELLATIONS: [
+    {
+      name: 'The Hub', // rings Polaris — "the one nail that never moves"
+      stars: [[0, 8], [60, 7], [120, 9], [180, 8], [240, 7], [300, 9]],
+      segs: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0]],
+    },
+    {
+      name: 'The Great Wain', // Big-Dipper-shaped: bowl + curving handle
+      stars: [[38, 29], [38, 35], [46, 37], [47, 31], [54, 29], [61, 25], [67, 19]],
+      segs: [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4], [4, 5], [5, 6]],
+    },
+    {
+      name: 'The Crown', // Cassiopeia-style W
+      stars: [[88, 28], [95, 33], [102, 27], [109, 33], [116, 28]],
+      segs: [[0, 1], [1, 2], [2, 3], [3, 4]],
+    },
+    {
+      name: 'The Wanderer', // Orion-like hourglass with a 3-star belt
+      stars: [[128, 45], [142, 46], [132, 55], [135, 56], [138, 57], [129, 66], [141, 65]],
+      segs: [[0, 2], [2, 3], [3, 4], [4, 1], [2, 5], [4, 6]],
+    },
+    {
+      name: 'The Four Lamps', // Crux-like kite/cross near the rim
+      stars: [[180, 74], [180, 84], [175, 79], [185, 79]],
+      segs: [[0, 1], [2, 3]],
+    },
+    {
+      name: 'The Serpent', // winding S-curve
+      stars: [[200, 48], [210, 54], [218, 62], [214, 70], [204, 74], [196, 68]],
+      segs: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]],
+    },
+    {
+      name: 'The Twin Lights', // two close pairs
+      stars: [[260, 38], [263, 40], [275, 39], [278, 41]],
+      segs: [[0, 1], [2, 3]],
+    },
+    {
+      name: 'The Swan', // Cygnus-like cross
+      stars: [[315, 45], [315, 38], [315, 53], [308, 45], [322, 45]],
+      segs: [[0, 1], [0, 2], [0, 3], [0, 4]],
+    },
+  ],
+
+  // Drifting rain cells (world.js) + patter proximity audio (audio.js)
+  RAIN: {
+    CELLS: 2, ALT: 1.5, DRIFT: 0.10, JITTER: 0.35, MAX_R: 8.3,
+    STREAKS: 90, STREAK_LEN: 0.18, FALL: 1.4, AUDIO_RADIUS: 4.0,
+  },
 };
 
 export class SimClock {
@@ -247,6 +346,61 @@ export function eclipseAlignmentFactor(clock) {
   const fmFactor  = 1 - smoothstep(fmErr / CONSTANTS.FULL_MOON_TOL);
   const segFactor = 1 - smoothstep(dist  / CONSTANTS.ECLIPSE_ALIGN_TOL);
   return fmFactor * segFactor;
+}
+
+// ── Almanac finders (Phase A plumbing for the sky almanac) ────────────────────
+
+// Next full moon: sun-moon phase separation (sim.moonPhase, unwrapped) grows
+// linearly with simTime at a rate derived from MOON_RATE_RATIO, exactly as
+// SimClock.sunAngle/moonAngle compute it. Full moon = separation of π (mod 2π).
+// Analytic — no scanning. Returns the smallest simTime strictly greater than
+// fromSimTime + 0.01.
+export function findNextFullMoon(fromSimTime) {
+  // d(sunAngle)/dt = (2π/24) rad/h; d(moonAngle)/dt = (2π/24)·MOON_RATE_RATIO rad/h.
+  // phase(t) = sunAngle(t) - moonAngle(t) grows at omega = (2π/24)(1 - MOON_RATE_RATIO).
+  const omega = (2 * Math.PI / 24) * (1 - CONSTANTS.MOON_RATE_RATIO);
+  const synodicPeriod = (2 * Math.PI) / omega; // ≈ 29.53 days in hours
+
+  const currentPhase = _normalizeAngle(omega * fromSimTime);
+  let deltaT = _normalizeAngle(Math.PI - currentPhase) / omega;
+  if (deltaT < 0.01) deltaT += synodicPeriod; // already (almost) full — jump to the next one
+  return fromSimTime + deltaT;
+}
+
+// Next solstice: day 172 noon ('Jun 21') or day 355 noon ('Dec 21'), whichever
+// comes first strictly after fromSimTime (wraps into the next year as needed).
+export function findNextSolstice(fromSimTime) {
+  const YEAR = 365 * 24;
+  const candidates = [
+    { base: 172 * 24 + 12, label: 'Jun 21' },
+    { base: 355 * 24 + 12, label: 'Dec 21' },
+  ];
+  let best = null;
+  for (let k = -1; k <= 2; k++) {
+    for (const { base, label } of candidates) {
+      const t = base + k * YEAR;
+      if (t > fromSimTime && (best === null || t < best.simTime)) {
+        best = { simTime: t, label };
+      }
+    }
+  }
+  return best;
+}
+
+// Active meteor shower for a given day-of-year, wrap-aware (distance modulo 365).
+export function activeShower(day) {
+  for (const shower of CONSTANTS.METEOR_SHOWERS) {
+    const raw = Math.abs(day - shower.day);
+    const dist = Math.min(raw, 365 - raw);
+    if (dist <= shower.span) return shower;
+  }
+  return null;
+}
+
+// Winter creep factor (0..1): 1 at FROST_PEAK_DAY (Dec 21), 0 at the opposite
+// solstice. Drives the frost ring's inner radius and opacity.
+export function frostFactor(day) {
+  return (1 + Math.cos(2 * Math.PI * (day - CONSTANTS.FROST_PEAK_DAY) / 365)) / 2;
 }
 
 export function latLonToDisc(lat, lon) {

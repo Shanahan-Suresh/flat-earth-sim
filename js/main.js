@@ -4,12 +4,12 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPixelatedPass } from 'three/addons/postprocessing/RenderPixelatedPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-import { SimClock } from './sim.js';
-import { buildWorld } from './world.js';
-import { buildSky, updateSky } from './sky.js';
+import { SimClock, CONSTANTS } from './sim.js';
+import { buildWorld, buildRain, updateRain, updateFrost } from './world.js';
+import { buildSky, updateSky, updateMeteors } from './sky.js';
 import { initUI, updateUI, isGroundMode } from './ui.js';
-import { buildOverlays, maybeUpdateObserverBox } from './overlays.js';
-import { initAudio, setAudioEnabled, setEdgeMode as audioSetEdgeMode, setDayFactor } from './audio.js';
+import { buildOverlays, maybeUpdateObserverBox, buildCityLights, maybeUpdateCityLights, buildTraffic, updateTraffic } from './overlays.js';
+import { initAudio, setAudioEnabled, setEdgeMode as audioSetEdgeMode, setDayFactor, setRainIntensity, setEdgeProximity } from './audio.js';
 
 // Error log hook (dev)
 window.addEventListener('error', e => {
@@ -72,6 +72,9 @@ let _lastSkyTintOpacity = -1; // track last set value to avoid churn
 const world = buildWorld(scene);
 const sky = buildSky(scene);
 const overlays = buildOverlays(scene);
+const cityLights = buildCityLights(scene);
+const traffic    = buildTraffic(scene, overlays.routeCurves);
+const rain       = buildRain(scene);
 
 // ── Fog (only for infinite edge mode) ─────────────────────────────────────────
 const fogColor = 0x1a2a3a;
@@ -135,7 +138,8 @@ const sim = new SimClock();
 // ── applyState / captureState ─────────────────────────────────────────────────
 // applyState(params): drive UI inputs from a plain object; all keys optional.
 // params shape: {edge, dome, clouds, beam, shadow, day, time, speed, px, cam,
-//               view, model, aurora, routes, observers, audio}
+//               view, model, aurora, routes, observers, audio,
+//               traffic, lights, rain, constellations}
 function applyState(params) {
   const setInput = (id, val, evt) => {
     const el = document.getElementById(id);
@@ -155,17 +159,19 @@ function applyState(params) {
     ['clouds',    'chk-clouds'],
     ['beam',      'chk-sunbeam'],
     ['shadow',    'chk-shadow'],
-    // stub keys for future phases
     ['aurora',    'chk-aurora'],
     ['routes',    'chk-routes'],
     ['observers', 'chk-observers'],
     ['audio',     'chk-audio'],
+    ['traffic',        'chk-traffic'],
+    ['lights',         'chk-lights'],
+    ['rain',           'chk-rain'],
+    ['constellations', 'chk-constellations'],
   ];
   for (const [key, id] of boolMap) {
     if (params[key] !== undefined) setInput(id, !!params[key]);
   }
 
-  // Stub radio groups for future phases
   if (params.view !== undefined) {
     const vEl = document.getElementById(
       params.view === 'ground' ? 'view-ground' : 'view-diorama'
@@ -237,14 +243,17 @@ function captureState() {
     ],
   };
 
-  // Stub keys — only included if elements exist
+  // Radio groups and toggle checkboxes — only included if elements exist
   const view = readRadio([['view-diorama','diorama'],['view-ground','ground']]);
   if (view !== undefined) state.view = view;
 
   const model = readRadio([['model-monopole','monopole'],['model-bipolar','bipolar']]);
   if (model !== undefined) state.model = model;
 
-  for (const [key, id] of [['aurora','chk-aurora'],['routes','chk-routes'],['observers','chk-observers'],['audio','chk-audio']]) {
+  for (const [key, id] of [
+    ['aurora','chk-aurora'],['routes','chk-routes'],['observers','chk-observers'],['audio','chk-audio'],
+    ['traffic','chk-traffic'],['lights','chk-lights'],['rain','chk-rain'],['constellations','chk-constellations'],
+  ]) {
     const v = readChk(id);
     if (v !== undefined) state[key] = v;
   }
@@ -271,6 +280,10 @@ function serializeState(state) {
   if (state.observers !== undefined) p.set('observers', state.observers ? '1' : '0');
   if (state.aurora    !== undefined) p.set('aurora',    state.aurora    ? '1' : '0');
   if (state.audio     !== undefined) p.set('audio',     state.audio     ? '1' : '0');
+  if (state.traffic        !== undefined) p.set('traffic',        state.traffic        ? '1' : '0');
+  if (state.lights         !== undefined) p.set('lights',         state.lights         ? '1' : '0');
+  if (state.rain           !== undefined) p.set('rain',           state.rain           ? '1' : '0');
+  if (state.constellations !== undefined) p.set('constellations', state.constellations ? '1' : '0');
   return p.toString();
 }
 
@@ -333,6 +346,10 @@ controls.addEventListener('end', scheduleSave);
   if (qp.get('observers') !== null) urlState.observers = qp.get('observers') !== '0';
   if (qp.get('model')     !== null) urlState.model     = qp.get('model');
   if (qp.get('audio')     !== null) urlState.audio     = qp.get('audio')     !== '0';
+  if (qp.get('traffic')        !== null) urlState.traffic        = qp.get('traffic')        !== '0';
+  if (qp.get('lights')         !== null) urlState.lights         = qp.get('lights')         !== '0';
+  if (qp.get('rain')           !== null) urlState.rain           = qp.get('rain')           !== '0';
+  if (qp.get('constellations') !== null) urlState.constellations = qp.get('constellations') !== '0';
   if (Object.keys(urlState).length) {
     // If switching to ground view with an explicit cam param, override ground default pos
     if (urlState.view === 'ground' && urlState.cam) {
@@ -387,8 +404,18 @@ function animate() {
   // Tick simulation
   sim.tick(dtReal);
 
+  // Day factor: d ∈ [-1,1] where 1 = camera facing directly toward the sun,
+  // mapped to [0,1] with smoothstep. Hoisted above updateSky so meteors/audio
+  // (Phase B/D) can consume it too.
+  const camAz  = Math.atan2(camera.position.z, camera.position.x);
+  const sunAz  = Math.atan2(sim.sunZ, sim.sunX);
+  const dDay   = Math.cos(camAz - sunAz);
+  const tDay   = (dDay + 1) * 0.5;
+  const dayFactor = tDay * tDay * (3 - 2 * tDay);
+
   // Update celestial objects
   updateSky(sky, sim, toggles);
+  updateMeteors(sky, sim, dtReal, dayFactor);
 
   // Update cloud orbits
   if (world.cloudGroup.visible) {
@@ -409,19 +436,27 @@ function animate() {
   // Update cloud visibility
   world.cloudGroup.visible = toggles.clouds;
 
+  // Drifting rain cells + winter creep
+  if (toggles.rain) {
+    rain.rainGroup.visible = true;
+    const centers = updateRain(rain, sim, dtReal);
+    let dNearest = Infinity;
+    for (const c of centers) {
+      const dx = c.x - controls.target.x, dz = c.z - controls.target.z;
+      dNearest = Math.min(dNearest, Math.sqrt(dx * dx + dz * dz));
+    }
+    setRainIntensity(Math.max(0, Math.min(1, 1 - dNearest / CONSTANTS.RAIN.AUDIO_RADIUS)));
+  } else {
+    rain.rainGroup.visible = false;
+    setRainIntensity(0);
+  }
+  updateFrost(world, sim);
+
   // Update controls
   controls.update();
 
   // ── Day/night sky tint + star dimming ────────────────────────────────────────
   {
-    const camAz  = Math.atan2(camera.position.z, camera.position.x);
-    const sunAz  = Math.atan2(sim.sunZ, sim.sunX);
-    // d ∈ [-1,1]; 1 = camera facing directly toward sun
-    const d = Math.cos(camAz - sunAz);
-    // map to [0,1] with smoothstep
-    const t = (d + 1) * 0.5;
-    const dayFactor = t * t * (3 - 2 * t);
-
     // Sky tint opacity — only update when change > 0.01
     if (skyTint) {
       const op = parseFloat((dayFactor * 0.5).toFixed(2));
@@ -438,8 +473,17 @@ function animate() {
       });
     }
 
+    // Constellation dimming — same day/night curve as the star field
+    if (sky.constellationLines) sky.constellationLines.material.opacity = sky.constellationLinesBaseOpacity * (1 - dayFactor * 0.85);
+    if (sky.constellationStars) sky.constellationStars.material.opacity = sky.constellationStarsBaseOpacity * (1 - dayFactor * 0.85);
+
     // Audio day factor (cheap — setDayFactor throttles internally)
     setDayFactor(dayFactor);
+
+    // Foghorn proximity: how close the camera is to the disc edge (radius 10)
+    const camR = Math.sqrt(camera.position.x * camera.position.x + camera.position.z * camera.position.z);
+    const edgeProx = Math.max(0, Math.min(1, (camR - 6.5) / 3.0));
+    setEdgeProximity(edgeProx * edgeProx * (3 - 2 * edgeProx)); // smoothstep
   }
 
   // Update UI readouts
@@ -450,6 +494,12 @@ function animate() {
     const isBipolar = toggles.model === 'bipolar';
     overlays.routesGroup.visible    = toggles.routes    && !isBipolar;
     overlays.observersGroup.visible = toggles.observers && !isBipolar;
+
+    cityLights.lightsGroup.visible = toggles.lights && !isBipolar;
+    if (cityLights.lightsGroup.visible) maybeUpdateCityLights(cityLights, sim);
+
+    traffic.trafficGroup.visible = toggles.traffic && !isBipolar;
+    if (traffic.trafficGroup.visible) updateTraffic(traffic, sim);
   }
 
   // Update observer box (throttled ~4×/sec)

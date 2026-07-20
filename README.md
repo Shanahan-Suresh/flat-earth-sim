@@ -24,6 +24,21 @@ A real-time 3D diorama of the flat-earth consensus model as described by [TFES (
 
 ---
 
+## What's new in v1.2 — the Cozy Update
+
+The disc got livelier and warmer without losing an ounce of lore.
+
+- **☾ ALMANAC panel** — a new panel section that always shows the next **full moon**, the next **Shadow-Object eclipse**, and the next **solstice**, each with a ⏩ button to jump straight there. When a meteor shower is running, its name lights up (`☄ THE LANTERNFALL`). The eclipse ⏩ moved here from the TIME section; `?eclipse=1` still works.
+- **Shooting stars & meteor showers** — faint streaks cross the dome on the night side. Three lore-named showers recur on the calendar and multiply the rate: *The Lanternfall* (day 224), *The Wheelwright's Sparks* (day 349), *The Dome-Menders* (day 4).
+- **Constellations** — eight named figures hang on the underside of the dome and ride the sidereal wheel. *The Hub* circles Polaris, "the one nail that never moves." Toggle in ★ THE HEAVENS.
+- **Ships & planes** — airliners fly the flat map's true routes (a 14-hour southern crossing, closed cockpits) and ships trace ocean loops. Toggle in ◈ OVERLAYS; auto-disabled on the bipolar map.
+- **City lights** — thirteen cities kindle below the dome the moment the sun's spotlight slides off them, and go dark again under the day patch. Toggle in ◈ OVERLAYS.
+- **Drifting rain cells** — dark cloud cells wander the disc trailing rain streaks, all in the lower air beneath the firmament. Bring the camera near a cell with sound on and the patter rises. Toggle in ★ THE HEAVENS.
+- **Winter creep** — a ring of frost breathes in and out with the day of year, thickest near the December solstice and thinnest in high summer. Rides the calendar; no toggle.
+- **Living ambience** — with sound on, crickets swell after dark, birdsong stitches the dawn and dusk twilight, and near the ice wall a foghorn calls through the mist. Rides the existing ♪ Sound toggle.
+
+---
+
 ## What's new in v1.1
 
 - **True azimuthal-equidistant map** — the disc texture now uses the real AE projection (`radius = (90 − lat)/180`, south pole at the ice ring), so the continents sit where the lore says they should. Honest note: v1.0's map was eyeballed; the disc looks slightly different now, and correctly so.
@@ -96,10 +111,11 @@ Then open **http://localhost:8000**
 
 | Section | Controls |
 |---|---|
-| **★ THE HEAVENS** | Toggle dome, clouds, sun beam, shadow object, aurora; MODEL radio (Monopole / Bipolar) |
-| **◈ OVERLAYS** | Flight Routes (with flat-vs-real distance box), Observers (KL/LON/NYC pins + local solar time box) |
+| **★ THE HEAVENS** | Toggle dome, clouds, sun beam, shadow object, aurora, constellations, rain; MODEL radio (Monopole / Bipolar) |
+| **◈ OVERLAYS** | Flight Routes (with flat-vs-real distance box), Observers (KL/LON/NYC pins + local solar time box), Traffic (planes + ships), City Lights |
 | **◆ THE EDGE** | Ice Wall / Edge Waterfall / Infinite Plane / Lands Beyond |
-| **⏱ TIME** | Pause/Resume, **ECLIPSE ⏩** (jump to next Shadow-Object eclipse), speed (0–20×), day-of-year scrubber |
+| **☾ ALMANAC** | Next full moon / eclipse / solstice, each with a ⏩ jump button; meteor-shower banner when one is active |
+| **⏱ TIME** | Pause/Resume, speed (0–20×), day-of-year scrubber |
 | **◈ LOOK** | Pixel size (2–8 px), ♪ Sound toggle, Diorama / Ground view radio, RESET CAM, 📷 PHOTO |
 | **✦ POSTCARDS** | Midnight Sun · Falls at Dusk · December Rush · Beyond the Wall · Blood Moon |
 | **?** | About modal with lore constants + *Reset all settings* |
@@ -119,6 +135,10 @@ Initial state can be set via query string — useful for sharing views and autom
 | `aurora` | `0` \| `1` | Aurora curtains over the ice wall |
 | `routes` | `0` \| `1` | Flight routes overlay + distance box |
 | `observers` | `0` \| `1` | Observer pins + local solar time box |
+| `traffic` | `0` \| `1` | Planes on the routes + ships on ocean loops |
+| `lights` | `0` \| `1` | City lights that kindle on the night side |
+| `constellations` | `0` \| `1` | Named dome constellations |
+| `rain` | `0` \| `1` | Drifting rain cells (patter when the camera is near one) |
 | `audio` | `0` \| `1` | Procedural sound (starts on first click/keypress — browser gesture rule) |
 | `view` | `diorama` \| `ground` | Camera mode |
 | `model` | `monopole` \| `bipolar` | Flat-earth map variant |
@@ -151,6 +171,11 @@ Example: `?day=191&time=21.7&shadow=1&speed=0` — a blood moon, paused.
 | Dome apex | ~3,100–6,000 mi (flattened hemisphere, Y-scale 0.32) |
 | Planets | Tychonic: epicycles around the sun's position |
 | Shadow Object | Invisible satellite of the sun; causes lunar eclipses (period ~20 sim-days) |
+| Synodic month | 29.53 days (full-moon spacing, solved analytically) |
+| Solstices | Day 172 (Jun 21) and day 355 (Dec 21) |
+| Frost ring | Breathes with `(1 + cos(2π(day − 355)/365))/2` — thickest near the Dec solstice |
+| Meteor showers | The Lanternfall (day 224, ×8), The Wheelwright's Sparks (day 349, ×6), The Dome-Menders (day 4, ×5) |
+| Constellations | 8 named figures fixed to the sidereal star wheel; The Hub rings Polaris |
 
 ### Celestial mechanics
 
@@ -182,14 +207,18 @@ The eclipse finder scans forward through sim time for the next moment the Shadow
 js/main.js        — renderer setup, EffectComposer, OrbitControls, animation loop,
                     state capture/apply/serialize, localStorage persistence, view modes
 js/sim.js         — wall clock, orbital math, CONSTANTS (all lore values live here),
-                    eclipse finder, lat/lon → disc projection
-js/world.js       — disc geometry, ice wall, and all four edge variants; bipolar map swap
+                    eclipse/full-moon/solstice finders, meteor-shower + frost math,
+                    lat/lon → disc projection
+js/world.js       — disc geometry, ice wall, and all four edge variants; bipolar map swap;
+                    frost ring, drifting rain cells
 js/sky.js         — sun, moon, stars, dome, planets, Shadow Object, aurora, twilight ring,
-                    sun glitter, blood-moon tint
-js/overlays.js    — flight routes + observer pins on the AE map; distance & solar-time boxes
-js/audio.js       — procedural WebAudio: wind, firmament pad, waterfall crossfade
+                    sun glitter, blood-moon tint; constellations, shooting stars
+js/overlays.js    — flight routes + observer pins on the AE map; distance & solar-time boxes;
+                    traffic (planes + ships), city lights
+js/audio.js       — procedural WebAudio: wind, firmament pad, waterfall crossfade,
+                    rain, crickets, dawn/dusk birds, ice-wall foghorn
 js/textures.js    — all textures procedural via Canvas 2D (no binary image assets)
-js/ui.js          — right-panel HTML controls, postcards, lore tooltips, photo mode
+js/ui.js          — right-panel HTML controls, almanac panel, postcards, lore tooltips, photo mode
 
 vendor/           — pinned Three.js 0.180.0 (intentionally committed, no CDN)
   three.module.js — re-exports from three.core.js (both files required)

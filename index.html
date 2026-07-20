@@ -58,6 +58,14 @@
         <input type="checkbox" id="chk-aurora" checked>
         <span>Aurora</span>
       </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-constellations" checked>
+        <span>Constellations</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-rain" checked>
+        <span>Rain</span>
+      </label>
       <div class="label-small" style="margin-top:6px;">MODEL</div>
       <div class="radio-group-row">
         <label class="radio-row">
@@ -80,6 +88,14 @@
       <label class="checkbox-row">
         <input type="checkbox" id="chk-observers">
         <span>Observers</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-traffic" checked>
+        <span>Ships &amp; Planes</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-lights" checked>
+        <span>City Lights</span>
       </label>
     </div>
 
@@ -107,7 +123,6 @@
       <div class="section-title">⏱ TIME</div>
       <div class="control-row">
         <button id="btn-pause" class="pixel-btn">⏸ PAUSE</button>
-        <button id="btn-next-eclipse" class="pixel-btn">ECLIPSE ⏩</button>
       </div>
       <div class="slider-row">
         <span>Speed</span>
@@ -119,6 +134,26 @@
         <input type="range" id="slider-day" min="0" max="364" value="172">
       </div>
       <div id="label-day" class="label-small">Day 172 · Jun · Summer</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">☾ ALMANAC</div>
+      <div class="almanac-row">
+        <span class="alm-label">Full moon</span>
+        <span id="alm-fullmoon-val" class="alm-val">—</span>
+        <button id="btn-alm-fullmoon" class="pixel-btn alm-btn" title="Jump to next full moon">⏩</button>
+      </div>
+      <div class="almanac-row">
+        <span class="alm-label">Eclipse</span>
+        <span id="alm-eclipse-val" class="alm-val">—</span>
+        <button id="btn-alm-eclipse" class="pixel-btn alm-btn" title="Jump to next lunar eclipse">⏩</button>
+      </div>
+      <div class="almanac-row">
+        <span class="alm-label">Solstice</span>
+        <span id="alm-solstice-val" class="alm-val">—</span>
+        <button id="btn-alm-solstice" class="pixel-btn alm-btn" title="Jump to next solstice">⏩</button>
+      </div>
+      <div id="alm-shower" class="alm-shower" style="display:none;"></div>
     </div>
 
     <div class="panel-section">
@@ -196,6 +231,10 @@
         <tr><td>Moon angular rate</td><td>347.81°/day → 29.53-day synodic month</td></tr>
         <tr><td>Star wheel period</td><td>23.93 h sidereal</td></tr>
         <tr><td>Dome apex</td><td>~3,100–6,000 mi est.</td></tr>
+        <tr><td>Synodic month</td><td>29.53 days (full-moon spacing)</td></tr>
+        <tr><td>Solstices</td><td>Day 172 (Jun 21) · Day 355 (Dec 21)</td></tr>
+        <tr><td>Meteor showers</td><td>Lanternfall (224) · Wheelwright's Sparks (349) · Dome-Menders (4)</td></tr>
+        <tr><td>Constellations</td><td>8 dome figures; The Hub rings Polaris</td></tr>
       </table>
 
       <div class="modal-table-title">WHAT CONSENSUS SAYS</div>

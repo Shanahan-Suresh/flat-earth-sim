@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { CONSTANTS } from './sim.js';
-import { makeWorldMapTexture, makeWaterfallTexture, makeBipolarMapTexture } from './textures.js';
+import { CONSTANTS, frostFactor } from './sim.js';
+import { makeWorldMapTexture, makeWaterfallTexture, makeBipolarMapTexture, makeFrostTexture } from './textures.js';
 
 export function buildWorld(scene) {
   // ── Disc ──────────────────────────────────────────────────────────────────
@@ -19,6 +19,19 @@ export function buildWorld(scene) {
   const disc = new THREE.Mesh(discGeo, discMats);
   disc.position.y = -0.15; // shift down so top face sits at y=0
   scene.add(disc);
+
+  // ── Winter creep / frost ring ─────────────────────────────────────────────
+  // Flat disc textured with a radial frost gradient; opacity + inner radius
+  // ride frostFactor(day), peaking at the Dec 21 solstice. Self-throttled in
+  // updateFrost — redraws only once per sim-day change.
+  const frost = makeFrostTexture();
+  const frostMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(9.9, 64),
+    new THREE.MeshBasicMaterial({ map: frost.texture, transparent: true, opacity: 0, depthWrite: false })
+  );
+  frostMesh.rotation.x = -Math.PI / 2;
+  frostMesh.position.y = 0.152; // above disc top (0), below twilight ring (0.16)
+  scene.add(frostMesh);
 
   // ── Ice Wall ──────────────────────────────────────────────────────────────
   const iceWallGroup = new THREE.Group();
@@ -231,6 +244,9 @@ export function buildWorld(scene) {
     waterfallTex: wfTex,
     infiniteGroup,
     beyondGroup,
+    frostMesh,
+    frostRedraw: frost.redraw,
+    _lastFrostDay: null,
 
     setEdgeMode(mode) {
       // mode: 'icewall' | 'waterfall' | 'infinite' | 'beyond'
@@ -251,4 +267,126 @@ export function buildWorld(scene) {
       topMat.needsUpdate = true;
     },
   };
+}
+
+// ── Winter creep update ────────────────────────────────────────────────────────
+// Self-throttles on sim.day change — zero per-frame cost otherwise.
+export function updateFrost(world, sim) {
+  if (sim.day === world._lastFrostDay) return;
+  world._lastFrostDay = sim.day;
+
+  const s = frostFactor(sim.day);
+  const innerRadius = CONSTANTS.FROST_INNER_MAX - s * (CONSTANTS.FROST_INNER_MAX - CONSTANTS.FROST_INNER_MIN);
+  world.frostRedraw(innerRadius / 9.9);
+  world.frostMesh.material.opacity = CONSTANTS.FROST_MAX_OPACITY * (0.25 + 0.75 * s);
+}
+
+// ── Drifting rain cells ────────────────────────────────────────────────────────
+export function buildRain(scene) {
+  const rainGroup = new THREE.Group();
+  const cells = [];
+
+  for (let c = 0; c < CONSTANTS.RAIN.CELLS; c++) {
+    const cellGroup = new THREE.Group();
+    const startAngle = Math.random() * Math.PI * 2;
+    const startR = 2 + Math.random() * 5;
+    const x0 = startR * Math.cos(startAngle);
+    const z0 = startR * Math.sin(startAngle);
+    cellGroup.position.set(x0, CONSTANTS.RAIN.ALT, z0);
+    cellGroup.userData = { heading: Math.random() * Math.PI * 2, x: x0, z: z0 };
+
+    // Flattened dark cloud blobs (mirrors the cloudGroup construction above)
+    const blobCount = 4 + Math.floor(Math.random() * 2); // 4-5
+    for (let b = 0; b < blobCount; b++) {
+      const blobGeo = new THREE.SphereGeometry(0.28 + Math.random() * 0.15, 6, 4);
+      const blobMat = new THREE.MeshToonMaterial({
+        color: 0x8a90a8,
+        emissive: 0x5a6078,
+        emissiveIntensity: 0.35,
+      });
+      const blob = new THREE.Mesh(blobGeo, blobMat);
+      blob.scale.y = 0.35;
+      blob.position.set(
+        (Math.random() - 0.5) * 0.6,
+        (Math.random() - 0.5) * 0.12,
+        (Math.random() - 0.5) * 0.6
+      );
+      cellGroup.add(blob);
+    }
+
+    // Vertical rain streaks scattered in a radius-0.7 cylinder under the cloud
+    const streakCount = CONSTANTS.RAIN.STREAKS;
+    const positions = new Float32Array(streakCount * 2 * 3);
+    for (let i = 0; i < streakCount; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * 0.7;
+      const sx = r * Math.cos(a);
+      const sz = r * Math.sin(a);
+      const sy = 0.2 + Math.random() * 1.2; // ~0.2..1.4
+
+      positions[i * 6 + 0] = sx;
+      positions[i * 6 + 1] = sy;
+      positions[i * 6 + 2] = sz;
+      positions[i * 6 + 3] = sx;
+      positions[i * 6 + 4] = sy - CONSTANTS.RAIN.STREAK_LEN;
+      positions[i * 6 + 5] = sz;
+    }
+    const streakGeo = new THREE.BufferGeometry();
+    const streakPosAttr = new THREE.Float32BufferAttribute(positions, 3);
+    streakPosAttr.setUsage(THREE.DynamicDrawUsage);
+    streakGeo.setAttribute('position', streakPosAttr);
+    const streakMat = new THREE.LineBasicMaterial({
+      color: 0xa8c8e0, transparent: true, opacity: 0.5, depthWrite: false,
+    });
+    const streaks = new THREE.LineSegments(streakGeo, streakMat);
+    cellGroup.add(streaks);
+    cellGroup.userData.streaks = streaks;
+
+    rainGroup.add(cellGroup);
+    cells.push(cellGroup);
+  }
+
+  scene.add(rainGroup);
+  return { rainGroup, cells };
+}
+
+// Returns array of {x, z} cell centers (Phase D reads these for audio proximity).
+export function updateRain(rain, sim, dtReal) {
+  const dt = sim.paused ? 0 : dtReal;
+  const centers = [];
+
+  for (const cell of rain.cells) {
+    const ud = cell.userData;
+
+    ud.heading += (Math.random() - 0.5) * CONSTANTS.RAIN.JITTER * dt;
+    ud.x += Math.cos(ud.heading) * CONSTANTS.RAIN.DRIFT * dt;
+    ud.z += Math.sin(ud.heading) * CONSTANTS.RAIN.DRIFT * dt;
+
+    const rad = Math.sqrt(ud.x * ud.x + ud.z * ud.z);
+    if (rad > CONSTANTS.RAIN.MAX_R) {
+      ud.heading = Math.atan2(-ud.z, -ud.x); // nudge back toward center
+    }
+
+    cell.position.x = ud.x;
+    cell.position.z = ud.z;
+
+    const posAttr = ud.streaks.geometry.attributes.position;
+    const arr = posAttr.array;
+    const fall = CONSTANTS.RAIN.FALL * dt;
+    for (let i = 0; i < CONSTANTS.RAIN.STREAKS; i++) {
+      let topY = arr[i * 6 + 1] - fall;
+      let botY = arr[i * 6 + 4] - fall;
+      if (topY < 0.2) {
+        topY = 1.4;
+        botY = 1.4 - CONSTANTS.RAIN.STREAK_LEN;
+      }
+      arr[i * 6 + 1] = topY;
+      arr[i * 6 + 4] = botY;
+    }
+    posAttr.needsUpdate = true;
+
+    centers.push({ x: ud.x, z: ud.z });
+  }
+
+  return centers;
 }

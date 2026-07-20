@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SimClock, findNextLunarEclipse } from './sim.js';
+import { SimClock, findNextLunarEclipse, findNextFullMoon, findNextSolstice, activeShower } from './sim.js';
 import { initAudio, setAudioEnabled, setEdgeMode as audioSetEdgeMode } from './audio.js';
 
 const LORE_TIPS = {
@@ -9,6 +9,7 @@ const LORE_TIPS = {
   'chk-sunbeam':   "The sun emits a focused cone of light, not a globe-illuminating beam. Only the disc below its path receives daylight — hence the rotating day/night boundary the flat model predicts.",
   'chk-shadow':    "The Flat Earth Society's answer to lunar eclipses: an invisible 'Shadow Object' orbits between the sun and moon, casting a shadow that explains every eclipse without a spherical Earth. (wiki.tfes.org)",
   'chk-aurora':    "Believers report auroras dancing over the ice wall's rim — light playing on the dome's inner edge, refracted through the ice. Rowbotham noted the aurora was always seen near the horizon, consistent with a rim effect.",
+  'chk-constellations': "The stars are lamps hung on the underside of the dome, turning once per sidereal day. The Hub circles Polaris, \"the one nail that never moves.\"",
 
   // Edge modes
   'edge-icewall':   "Samuel Rowbotham and modern TFES consensus: a 150-ft Antarctic ice wall rings the disc and holds the oceans in. The UN flag depicts it faithfully. Military treaties forbid civilian access — the official story.",
@@ -16,15 +17,22 @@ const LORE_TIPS = {
   'edge-infinite':  "A minority faction holds the plane extends forever — no ice wall, no edge, just ocean to infinity. They argue Antarctica isn't a continent at all, merely a ring of fractured ice at the observable boundary.",
   'edge-beyond':    "A popular 2020s flat-earth claim: entire continents exist beyond the ice wall, hidden by the Antarctic Treaty. Explorers allegedly turn back at 60°S by international agreement — covering up what lies beyond.",
 
-  // Eclipse button
-  'btn-next-eclipse': "The Shadow Object — a dark satellite no telescope has ever caught — orbits near the sun. When it passes between the sun and moon during a full moon, the moon turns blood-red. Click to jump to the next such alignment.",
+  // Almanac buttons
+  'btn-alm-eclipse': "The Shadow Object — a dark satellite no telescope has ever caught — orbits near the sun. When it passes between the sun and moon during a full moon, the moon turns blood-red. Click to jump to the next such alignment.",
+  'btn-alm-fullmoon': "The moon is no reflector but a cold, self-luminous lamp; it shows full face only when it swings directly opposite the sun's spotlight, once every 29.5 days. Click to jump to that night.",
+  'btn-alm-solstice': "The sun's spiral tightens to its smallest ring near the North-Pole hub on Jun 21, then widens all the way out past the ice wall by Dec 21. Click to jump to the next turning point.",
 
   // Overlays
   'chk-routes':     "On the flat map, southern hemisphere flights stretch enormously and route north past the equator. Airlines claim to fly Sydney–Santiago nonstop in ~12.5 h — flat earthers say the real route curves through North America, hidden by closed-cockpit navigation.",
   'chk-observers':  "The sun's spotlight circle determines local time: observers inside the lit patch have day, those outside have night. Local solar time is simply each point's angular position relative to the sun's azimuth.",
+  'chk-traffic':    "Overhead, airliners quietly fly the flat map's true routes — closed cockpits, curtained windows, and a 14-hour crossing over the southern reaches that a globe model would never require.",
+  'chk-lights':     "Cities need no lamps within the sun's spotlight — but the moment its cone slides past, streets and skylines kindle below the dome, exactly where the day patch used to be.",
+
+  // Weather
+  'chk-rain':       "Rowbotham held that all weather — rain included — lives in the lower air, drifting well beneath the solid firmament above.",
 
   // Sound
-  'chk-audio': "Wind sweeps endlessly across the infinite plane. The firmament above hums — a low resonance of creation at the world's edge.",
+  'chk-audio': "Wind sweeps endlessly across the infinite plane, and the firmament above hums — a low resonance of creation at the world's edge. Listen closer: crickets rise from the disc after dark, birdsong stitches the dawn and dusk twilight bands, and near the ice wall a distant foghorn calls through the mist.",
 
   // Model radios
   'model-monopole': "The standard TFES model: one North Pole at the disc center, Antarctica as the surrounding ice ring. First described systematically by Orlando Ferguson (1893) and refined by Rowbotham.",
@@ -50,6 +58,10 @@ const LORE = {
   audio:       "Wind over the endless plane, the slow hum of the firmament — the world has a sound, if you listen.",
   routes:    "On the flat map, Sydney→Santiago stretches double and detours north past the equator. Airlines fly it nonstop in ~12.5 h — flat earthers say the actual route curves through North America, hidden by closed-cockpit navigation.",
   bipolar:   "A rival map among flat-earthers: two poles side by side, continents clustered around each. Even its advocates don't agree on sun mechanics, so the sun keeps the standard spiral path.",
+  traffic:   "Airliners fly the flat map's true routes behind closed cockpits — 14-hour southern crossings the globe model would call impossible.",
+  lights:    "When the sun's spotlight slides on, the cities beneath kindle — no lamps needed inside the day patch.",
+  rain:      "Rowbotham held all weather lives in the lower air, well beneath the firmament.",
+  constellations: "Lamps hung on the underside of the dome, turning once per sidereal day. The Hub circles Polaris — the one nail that never moves.",
 };
 
 // Shared ground-mode flag readable by main.js animate loop
@@ -92,7 +104,7 @@ function updateDayLabel(d) {
 }
 
 export function initUI(sim, world, sky, composer, pixelPass, camera, controls, applyState, serializeState, setViewMode, requestPhotoSave) {
-  const toggles = { dome: true, clouds: true, sunBeam: true, shadowObject: false, aurora: true, view: 'diorama', routes: false, observers: false, model: 'monopole' };
+  const toggles = { dome: true, clouds: true, sunBeam: true, shadowObject: false, aurora: true, view: 'diorama', routes: false, observers: false, model: 'monopole', traffic: true, lights: true, rain: true, constellations: true };
   let currentEdge = 'icewall';
 
   function updateLore(overrideKey) {
@@ -224,6 +236,46 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     });
   }
 
+  // Traffic toggle (ships & planes) — visibility gated in main.js animate loop
+  const chkTraffic = document.getElementById('chk-traffic');
+  if (chkTraffic) {
+    chkTraffic.checked = toggles.traffic;
+    chkTraffic.addEventListener('change', e => {
+      toggles.traffic = e.target.checked;
+      updateLore(e.target.checked ? 'traffic' : undefined);
+    });
+  }
+
+  // City lights toggle
+  const chkLights = document.getElementById('chk-lights');
+  if (chkLights) {
+    chkLights.checked = toggles.lights;
+    chkLights.addEventListener('change', e => {
+      toggles.lights = e.target.checked;
+      updateLore(e.target.checked ? 'lights' : undefined);
+    });
+  }
+
+  // Rain toggle
+  const chkRain = document.getElementById('chk-rain');
+  if (chkRain) {
+    chkRain.checked = toggles.rain;
+    chkRain.addEventListener('change', e => {
+      toggles.rain = e.target.checked;
+      updateLore(e.target.checked ? 'rain' : undefined);
+    });
+  }
+
+  // Constellations toggle
+  const chkConstellations = document.getElementById('chk-constellations');
+  if (chkConstellations) {
+    chkConstellations.checked = toggles.constellations;
+    chkConstellations.addEventListener('change', e => {
+      toggles.constellations = e.target.checked;
+      updateLore(e.target.checked ? 'constellations' : undefined);
+    });
+  }
+
   // Audio toggle
   const chkAudio = document.getElementById('chk-audio');
   if (chkAudio) {
@@ -245,17 +297,23 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     if (world.setModel) world.setModel(mode);
     const routesEl  = document.getElementById('chk-routes');
     const obsEl     = document.getElementById('chk-observers');
+    const trafficEl = document.getElementById('chk-traffic');
+    const lightsEl  = document.getElementById('chk-lights');
     const box       = document.getElementById('observer-box');
     const routesBox = document.getElementById('routes-box');
     if (mode === 'bipolar') {
       if (routesEl)  routesEl.disabled = true;
       if (obsEl)     obsEl.disabled    = true;
+      if (trafficEl) trafficEl.disabled = true;
+      if (lightsEl)  lightsEl.disabled  = true;
       if (box)       box.style.display = 'none';
       if (routesBox) routesBox.style.display = 'none';
       updateLore('bipolar');
     } else {
       if (routesEl)  routesEl.disabled = false;
       if (obsEl)     obsEl.disabled    = false;
+      if (trafficEl) trafficEl.disabled = false;
+      if (lightsEl)  lightsEl.disabled  = false;
       if (box && obsEl && obsEl.checked) box.style.display = 'block';
       if (routesBox && routesEl && routesEl.checked) routesBox.style.display = 'block';
       updateLore();
@@ -294,10 +352,36 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     });
   }
 
-  // Next Eclipse button
-  const btnNextEclipse = document.getElementById('btn-next-eclipse');
-  if (btnNextEclipse) {
-    btnNextEclipse.addEventListener('click', jumpToEclipse);
+  // ── Almanac buttons ────────────────────────────────────────────────────────
+  function syncDayUI() {
+    updateDayLabel(sim.day);
+    const sd = document.getElementById('slider-day');
+    if (sd && document.activeElement !== sd) sd.value = sim.day;
+    if (btnPause) btnPause.textContent = 'Pause';
+  }
+
+  const btnAlmEclipse = document.getElementById('btn-alm-eclipse');
+  if (btnAlmEclipse) {
+    btnAlmEclipse.addEventListener('click', jumpToEclipse);
+  }
+
+  const btnAlmFullmoon = document.getElementById('btn-alm-fullmoon');
+  if (btnAlmFullmoon) {
+    btnAlmFullmoon.addEventListener('click', () => {
+      sim.simTime = findNextFullMoon(sim.simTime) - 1; // arrive ~1h early
+      sim.paused = false;
+      syncDayUI();
+    });
+  }
+
+  const btnAlmSolstice = document.getElementById('btn-alm-solstice');
+  if (btnAlmSolstice) {
+    btnAlmSolstice.addEventListener('click', () => {
+      const s = findNextSolstice(sim.simTime);
+      sim.simTime = s.simTime;
+      sim.paused = false;
+      syncDayUI();
+    });
   }
 
   // Speed slider
@@ -513,7 +597,7 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     });
 
     // Also attach to named buttons in LORE_TIPS
-    ['btn-next-eclipse'].forEach(id => {
+    ['btn-alm-fullmoon', 'btn-alm-eclipse', 'btn-alm-solstice'].forEach(id => {
       attachTooltip(document.getElementById(id), LORE_TIPS[id]);
     });
   }
@@ -523,6 +607,63 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
   updateDayLabel(sim.day);
 
   return toggles;
+}
+
+// ── Almanac refresh (throttled, cached across the ~400-sim-day eclipse scan) ──
+let _almCache = null;      // { fullMoonT, eclipseT, solsticeT, solsticeLabel, computedFrom }
+let _almLastRefresh = 0;
+
+function refreshAlmanac(sim) {
+  const now = performance.now();
+  if (now - _almLastRefresh < 1000) return;
+  _almLastRefresh = now;
+
+  const stale = !_almCache ||
+    sim.simTime < _almCache.computedFrom ||
+    sim.simTime > _almCache.fullMoonT ||
+    sim.simTime > _almCache.solsticeT ||
+    sim.simTime > _almCache.eclipseT;
+
+  if (stale) {
+    const fullMoonT = findNextFullMoon(sim.simTime);
+    const ecl = findNextLunarEclipse(sim.simTime);
+    const eclipseT = ecl === null ? Infinity : ecl;
+    const sol = findNextSolstice(sim.simTime);
+    _almCache = {
+      fullMoonT,
+      eclipseT,
+      solsticeT: sol.simTime,
+      solsticeLabel: sol.label,
+      computedFrom: sim.simTime,
+    };
+  }
+
+  function fmt(T) {
+    const day = Math.floor(T / 24) % 365;
+    const tod = T % 24;
+    const h = Math.floor(tod), m = Math.floor((tod % 1) * 60);
+    return 'Day ' + day + ' · ' + SimClock.monthName(day) + ' ' + pad(h) + ':' + pad(m);
+  }
+
+  const fmEl = document.getElementById('alm-fullmoon-val');
+  if (fmEl) fmEl.textContent = fmt(_almCache.fullMoonT);
+
+  const eclEl = document.getElementById('alm-eclipse-val');
+  if (eclEl) eclEl.textContent = _almCache.eclipseT === Infinity ? 'none this season' : fmt(_almCache.eclipseT);
+
+  const solEl = document.getElementById('alm-solstice-val');
+  if (solEl) solEl.textContent = fmt(_almCache.solsticeT) + ' · ' + _almCache.solsticeLabel;
+
+  const sh = activeShower(sim.day);
+  const shEl = document.getElementById('alm-shower');
+  if (shEl) {
+    if (sh) {
+      shEl.textContent = '☄ ' + sh.name.toUpperCase();
+      shEl.style.display = 'block';
+    } else {
+      shEl.style.display = 'none';
+    }
+  }
 }
 
 export function updateUI(sim, world, toggles) {
@@ -551,4 +692,6 @@ export function updateUI(sim, world, toggles) {
   if (daySlider && document.activeElement !== daySlider) {
     daySlider.value = d;
   }
+
+  refreshAlmanac(sim);
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CONSTANTS, latLonToDisc } from './sim.js';
-import { applyNearestFilter } from './textures.js';
+import { applyNearestFilter, makeGlowSprite, makePlaneTexture, makeShipTexture } from './textures.js';
 
 // ---------------------------------------------------------------------------
 // Routes
@@ -80,6 +80,7 @@ function makePinCanvas(color) {
 export function buildOverlays(scene) {
   const routesGroup = new THREE.Group();
   const observersGroup = new THREE.Group();
+  const routeCurves = [];
 
   // --- Routes ---
   for (const route of ROUTES) {
@@ -95,6 +96,7 @@ export function buildOverlays(scene) {
 
     // Tube along the route
     const path = new THREE.CatmullRomCurve3([fromVec, toVec]);
+    routeCurves.push(path);
     const tubeGeo = new THREE.TubeGeometry(path, 20, 0.035, 4, false);
     const tubeMat = new THREE.MeshBasicMaterial({ color: 0xffaa55 });
     routesGroup.add(new THREE.Mesh(tubeGeo, tubeMat));
@@ -138,7 +140,149 @@ export function buildOverlays(scene) {
 
   scene.add(observersGroup);
 
-  return { routesGroup, observersGroup, observers: OBSERVERS_WITH_POS };
+  return { routesGroup, observersGroup, observers: OBSERVERS_WITH_POS, routeCurves };
+}
+
+// ---------------------------------------------------------------------------
+// City lights
+// ---------------------------------------------------------------------------
+
+export function buildCityLights(scene) {
+  const lightsGroup = new THREE.Group();
+  const cities = CONSTANTS.CITY_LIGHTS;
+
+  const positions = new Float32Array(cities.length * 3);
+  const colors = new Float32Array(cities.length * 3);
+  const planar = [];
+
+  cities.forEach((city, i) => {
+    const p = latLonToDisc(city.lat, city.lon);
+    positions[i * 3 + 0] = p.x;
+    positions[i * 3 + 1] = 0.165;
+    positions[i * 3 + 2] = p.z;
+    planar.push({ x: p.x, z: p.z });
+  });
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const colorAttr = new THREE.Float32BufferAttribute(colors, 3);
+  colorAttr.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('color', colorAttr);
+
+  // makeGlowSprite already returns a THREE.Texture (applyNearestFilter'd) — use directly.
+  const glow = makeGlowSprite();
+  const map = glow.isTexture ? glow : applyNearestFilter(new THREE.CanvasTexture(glow));
+
+  const mat = new THREE.PointsMaterial({
+    size: 4,
+    sizeAttenuation: false,
+    vertexColors: true,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    map,
+  });
+  const points = new THREE.Points(geo, mat);
+  lightsGroup.add(points);
+  scene.add(lightsGroup);
+
+  return { lightsGroup, points, planar };
+}
+
+function _smoothstep(x) {
+  x = Math.max(0, Math.min(1, x));
+  return x * x * (3 - 2 * x);
+}
+
+export function updateCityLights(cityLights, sim) {
+  const { points, planar } = cityLights;
+  const colorAttr = points.geometry.attributes.color;
+
+  for (let i = 0; i < planar.length; i++) {
+    const dx = planar[i].x - sim.sunX;
+    const dz = planar[i].z - sim.sunZ;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const b = _smoothstep((dist - CONSTANTS.DAY_PATCH_RADIUS) / CONSTANTS.CITY_LIGHT_RAMP);
+    colorAttr.setXYZ(i, 1.0 * b, 0.72 * b, 0.35 * b);
+  }
+  colorAttr.needsUpdate = true;
+}
+
+// Throttled wrapper for use in main loop (250ms — mirrors maybeUpdateObserverBox)
+let _lastCityLightsUpdate = 0;
+export function maybeUpdateCityLights(cityLights, sim) {
+  const now = performance.now();
+  if (now - _lastCityLightsUpdate < 250) return;
+  _lastCityLightsUpdate = now;
+  updateCityLights(cityLights, sim);
+}
+
+// ---------------------------------------------------------------------------
+// Traffic — ships & planes
+// ---------------------------------------------------------------------------
+
+export function buildTraffic(scene, routeCurves) {
+  const trafficGroup = new THREE.Group();
+
+  const planeTex = applyNearestFilter(new THREE.CanvasTexture(makePlaneTexture()));
+  const shipTex  = applyNearestFilter(new THREE.CanvasTexture(makeShipTexture()));
+
+  const planes = routeCurves.map((curve, i) => {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.35, 0.35),
+      new THREE.MeshBasicMaterial({ map: planeTex, transparent: true, depthWrite: false })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = CONSTANTS.PLANE_ALTITUDE;
+    mesh.userData = { curve, phase: i * 0.37 };
+    trafficGroup.add(mesh);
+    return mesh;
+  });
+
+  const ships = CONSTANTS.SHIP_LOOPS.map(loop => {
+    const { x: cx, z: cz } = latLonToDisc(loop.lat, loop.lon);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.3, 0.22),
+      new THREE.MeshBasicMaterial({ map: shipTex, transparent: true, depthWrite: false })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.18;
+    mesh.userData = { cx, cz, r: loop.r, days: loop.days };
+    trafficGroup.add(mesh);
+    return mesh;
+  });
+
+  scene.add(trafficGroup);
+  return { trafficGroup, planes, ships };
+}
+
+// simTime-driven (freezes on pause, scales with speed — consistent with sun/moon).
+export function updateTraffic(traffic, sim) {
+  const { planes, ships } = traffic;
+
+  planes.forEach(mesh => {
+    const { curve, phase } = mesh.userData;
+    let t = ((sim.simTime / CONSTANTS.PLANE_TRIP_HOURS) + phase) % 2;
+    if (t < 0) t += 2;
+    const rev = t > 1;
+    if (rev) t = 2 - t;
+
+    const pos = curve.getPoint(t);
+    mesh.position.x = pos.x;
+    mesh.position.z = pos.z;
+
+    let tangent = curve.getTangent(t);
+    if (rev) tangent = tangent.clone().negate();
+    mesh.rotation.z = Math.atan2(tangent.z, tangent.x);
+  });
+
+  ships.forEach(mesh => {
+    const { cx, cz, r, days } = mesh.userData;
+    const a = 2 * Math.PI * sim.simTime / (24 * days);
+    mesh.position.x = cx + r * Math.cos(a);
+    mesh.position.z = cz + r * Math.sin(a);
+    mesh.rotation.z = a + Math.PI / 2;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +296,6 @@ export function updateObserverBox(obsData, sim) {
   if (!box || box.style.display === 'none') return;
 
   const sunAz = Math.atan2(sim.sunZ, sim.sunX);
-  const DAY_PATCH_RADIUS = 2.6; // units — derived from sunBeam cone base radius in sky.js
 
   const lines = obsData.map(obs => {
     const obsAz = Math.atan2(obs.z, obs.x);
@@ -166,7 +309,7 @@ export function updateObserverBox(obsData, sim) {
     const dx = obs.x - sim.sunX;
     const dz = obs.z - sim.sunZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
-    const icon = dist < DAY_PATCH_RADIUS ? '☀' : '☾';
+    const icon = dist < CONSTANTS.DAY_PATCH_RADIUS ? '☀' : '☾';
 
     return `${obs.name}: ${pad(h)}:${pad(m)} ${icon}`;
   });

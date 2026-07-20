@@ -63,12 +63,12 @@ Always serve from HTTP. `file://` blocks ES module imports. The importmap in `in
 | File | Purpose |
 |---|---|
 | `js/main.js` | Renderer setup, EffectComposer, OrbitControls, animation loop |
-| `js/sim.js` | Wall clock, orbital math, CONSTANTS (all lore values) |
-| `js/world.js` | Disc, ice wall, four edge variants |
-| `js/sky.js` | Sun, moon, stars, dome, planets, Shadow Object |
-| `js/overlays.js` | Flight routes + observer pins on the AE map; distance/solar-time DOM boxes |
-| `js/audio.js` | Procedural WebAudio: wind, firmament pad, waterfall crossfade (no audio files) |
+| `js/sim.js` | Wall clock, orbital math, CONSTANTS (all lore values); eclipse/full-moon/solstice finders, meteor-shower + frost math |
+| `js/world.js` | Disc, ice wall, four edge variants; frost ring, drifting rain cells |
+| `js/sky.js` | Sun, moon, stars, dome, planets, Shadow Object; constellations, shooting stars |
+| `js/overlays.js` | Flight routes + observer pins on the AE map; distance/solar-time DOM boxes; traffic (planes + ships), city lights |
+| `js/audio.js` | Procedural WebAudio: wind, firmament pad, waterfall crossfade, rain, crickets, dawn/dusk birds, ice-wall foghorn (no audio files) |
 | `js/textures.js` | Procedural Canvas 2D textures |
-| `js/ui.js` | Right-panel controls; reads/writes sim state |
+| `js/ui.js` | Right-panel controls, almanac panel; reads/writes sim state |
 | `smoke-test.html` | Headless render + framebuffer health check |
 | `vendor/` | Pinned Three.js 0.180.0 + addons |

@@ -19,9 +19,10 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPixelatedPass } from 'three/addons/postprocessing/RenderPixelatedPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SimClock } from './js/sim.js';
-import { buildWorld } from './js/world.js';
+import { SimClock, findNextFullMoon, findNextSolstice } from './js/sim.js';
+import { buildWorld, buildRain } from './js/world.js';
 import { buildSky, updateSky } from './js/sky.js';
+import { buildOverlays, buildCityLights, buildTraffic } from './js/overlays.js';
 
 const report = (msg) => {
   document.getElementById('report').textContent = 'REPORT: ' + msg;
@@ -40,8 +41,12 @@ try {
   scene.add(new THREE.AmbientLight(0xffd9aa, 0.35));
   const world = buildWorld(scene);
   const sky = buildSky(scene);
+  const rain = buildRain(scene);
+  const overlays = buildOverlays(scene);
+  const cityLights = buildCityLights(scene);
+  const traffic = buildTraffic(scene, overlays.routeCurves);
   const sim = new SimClock();
-  const toggles = { dome: true, clouds: true, sunBeam: true, shadowObject: false };
+  const toggles = { dome: true, clouds: true, sunBeam: true, shadowObject: false, traffic: true, lights: true, rain: true, constellations: true };
   updateSky(sky, sim, toggles);
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPixelatedPass(4, scene, camera));
@@ -57,7 +62,9 @@ try {
       if (colorSet.size < 50) colorSet.add((px[i]>>5)+','+(px[i+1]>>5)+','+(px[i+2]>>5));
     }
   }
-  report('lit=' + lit + '/480000 distinctColors=' + colorSet.size + ' objectsInScene=' + scene.children.length);
+  const fullMoon = findNextFullMoon(0);
+  const solstice = findNextSolstice(0);
+  report('lit=' + lit + '/480000 distinctColors=' + colorSet.size + ' objectsInScene=' + scene.children.length + ' fullMoon=' + fullMoon.toFixed(1) + ' solstice=' + solstice.label);
 } catch (e) {
   report('EXCEPTION: ' + e.message + ' | ' + (e.stack || '').slice(0, 300));
 }

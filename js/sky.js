@@ -1,6 +1,21 @@
 import * as THREE from 'three';
-import { CONSTANTS, eclipseAlignmentFactor } from './sim.js';
+import { CONSTANTS, eclipseAlignmentFactor, activeShower } from './sim.js';
 import { makeMoonPhaseTextures, makeTwilightTexture, makeAuroraTexture, makeSparkleTexture } from './textures.js';
+
+// Point on the star shell given azimuth (deg) and polar angle from the dome
+// apex (deg, 0 = apex where Polaris sits). Mirrors makeStarLayer's hemisphere
+// math exactly (same STAR_RADIUS, same STAR_Y_SCALE flatten) so constellations
+// and meteors sit on the same shell as the star field.
+export function mapDomeCoord(azDeg, polarDeg) {
+  const phi = polarDeg * Math.PI / 180;
+  const theta = azDeg * Math.PI / 180;
+  const r = CONSTANTS.STAR_RADIUS;
+  return new THREE.Vector3(
+    r * Math.sin(phi) * Math.cos(theta),
+    r * Math.cos(phi) * CONSTANTS.STAR_Y_SCALE,
+    r * Math.sin(phi) * Math.sin(theta)
+  );
+}
 
 export function buildSky(scene) {
   // ── Star Wheel ──────────────────────────────────────────────────────────────
@@ -33,7 +48,66 @@ export function buildSky(scene) {
 
   starGroup.add(makeStarLayer(400, 0xf0ead8, 1.5, 0.35)); // faint field
   starGroup.add(makeStarLayer(100, 0xffeec0, 2, 0.7));    // brighter pale-gold
+
+  // ── Constellations ──────────────────────────────────────────────────────────
+  // Lamps hung on the dome's underside — fixed figures in the star wheel, so
+  // they're built as one merged LineSegments + one merged Points and added as
+  // children of starGroup: sidereal co-rotation comes for free.
+  const constellationLinePositions = [];
+  const constellationStarPositions = [];
+  for (const figure of CONSTANTS.CONSTELLATIONS) {
+    for (const [az, polar] of figure.stars) {
+      const p = mapDomeCoord(az, polar);
+      constellationStarPositions.push(p.x, p.y, p.z);
+    }
+    for (const [i, j] of figure.segs) {
+      const a = mapDomeCoord(figure.stars[i][0], figure.stars[i][1]);
+      const b = mapDomeCoord(figure.stars[j][0], figure.stars[j][1]);
+      constellationLinePositions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+    }
+  }
+
+  const constellationLineGeo = new THREE.BufferGeometry();
+  constellationLineGeo.setAttribute('position', new THREE.Float32BufferAttribute(constellationLinePositions, 3));
+  const constellationLineMat = new THREE.LineBasicMaterial({
+    color: 0x9fb8ff, transparent: true, opacity: 0.4, depthWrite: false,
+  });
+  const constellationLines = new THREE.LineSegments(constellationLineGeo, constellationLineMat);
+
+  const constellationStarGeo = new THREE.BufferGeometry();
+  constellationStarGeo.setAttribute('position', new THREE.Float32BufferAttribute(constellationStarPositions, 3));
+  const constellationStarMat = new THREE.PointsMaterial({
+    color: 0xcfe0ff, size: 2.5, sizeAttenuation: false, transparent: true,
+  });
+  const constellationStars = new THREE.Points(constellationStarGeo, constellationStarMat);
+
+  starGroup.add(constellationLines);
+  starGroup.add(constellationStars);
+
+  const constellationLinesBaseOpacity = constellationLineMat.opacity;
+  const constellationStarsBaseOpacity = constellationStarMat.opacity;
+
   scene.add(starGroup);
+
+  // ── Shooting stars / meteors ─────────────────────────────────────────────────
+  // Pool of 3 reusable streaks, added to the SCENE (not starGroup) — meteors
+  // don't ride the sidereal wheel.
+  const meteors = [];
+  for (let i = 0; i < 3; i++) {
+    const meteorGeo = new THREE.BufferGeometry();
+    const meteorPosAttr = new THREE.Float32BufferAttribute(new Float32Array(6), 3);
+    meteorPosAttr.setUsage(THREE.DynamicDrawUsage);
+    meteorGeo.setAttribute('position', meteorPosAttr);
+    const meteorMat = new THREE.LineBasicMaterial({
+      color: 0xfff2c8, transparent: true, opacity: 0, depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const meteorLine = new THREE.Line(meteorGeo, meteorMat);
+    meteorLine.visible = false;
+    meteorLine.userData = { active: false, t: 0, from: new THREE.Vector3(), dir: new THREE.Vector3(), len: 0 };
+    scene.add(meteorLine);
+    meteors.push(meteorLine);
+  }
 
   // Polaris: fixed at apex, not in starGroup (it sits on the rotation axis)
   const polarisGeo = new THREE.SphereGeometry(0.04, 4, 4);
@@ -244,6 +318,11 @@ export function buildSky(scene) {
     auroraGroup,
     auroraPlanes,
     glitterMesh,
+    constellationLines,
+    constellationStars,
+    constellationLinesBaseOpacity,
+    constellationStarsBaseOpacity,
+    meteors,
   };
 }
 
@@ -298,6 +377,10 @@ export function updateSky(sky, clock, toggles) {
   // Stars rotate sidereal
   starGroup.rotation.y = -clock.starAngle;
 
+  // Constellations co-rotate with starGroup for free; just gate visibility
+  if (sky.constellationLines) sky.constellationLines.visible = (toggles.constellations !== false);
+  if (sky.constellationStars) sky.constellationStars.visible = (toggles.constellations !== false);
+
   // Shadow object — always position it (eclipseAlignmentFactor uses it); only render when toggled
   {
     const sp = clock.shadowObjectPosition(sx, sz);
@@ -336,4 +419,53 @@ export function updateSky(sky, clock, toggles) {
       sz + config.orbitRadius * Math.sin(epicycleAngle)
     );
   });
+}
+
+// ── Shooting stars / meteors ───────────────────────────────────────────────────
+// dtReal-driven (a meteor is a viewer moment, like cloud drift). dayFactor is
+// camera-relative: meteors only spawn when the camera is looking away from the
+// sun, consistent with the existing star-dimming convention.
+export function updateMeteors(sky, sim, dtReal, dayFactor) {
+  const { meteors } = sky;
+  const canSpawn = dayFactor < CONSTANTS.METEOR_NIGHT_THRESHOLD;
+  const shower = activeShower(sim.day);
+  const mult = shower ? shower.mult : 1;
+
+  for (const m of meteors) {
+    const ud = m.userData;
+
+    if (!ud.active) {
+      if (canSpawn) {
+        const rate = CONSTANTS.METEOR_BASE_RATE * mult * dtReal;
+        if (Math.random() < rate) {
+          const az = Math.random() * 360;
+          const polar = 15 + Math.random() * 40; // high dome, 15-55 deg from apex
+          ud.from.copy(mapDomeCoord(az, polar));
+          const headingRad = Math.random() * Math.PI * 2;
+          ud.dir.set(Math.cos(headingRad), -0.6 - Math.random() * 0.4, Math.sin(headingRad)).normalize();
+          ud.len = 1.2;
+          ud.t = 0;
+          ud.active = true;
+          m.visible = true;
+        }
+      }
+      if (!ud.active) continue;
+    }
+
+    ud.t += dtReal / CONSTANTS.METEOR_DURATION;
+    if (ud.t >= 1) {
+      ud.active = false;
+      m.visible = false;
+      m.material.opacity = 0;
+      continue;
+    }
+
+    const head = ud.from.clone().addScaledVector(ud.dir, ud.t * ud.len);
+    const tail = head.clone().addScaledVector(ud.dir, -0.25 * ud.len);
+    const posAttr = m.geometry.attributes.position;
+    posAttr.setXYZ(0, tail.x, tail.y, tail.z);
+    posAttr.setXYZ(1, head.x, head.y, head.z);
+    posAttr.needsUpdate = true;
+    m.material.opacity = Math.sin(Math.PI * ud.t);
+  }
 }
