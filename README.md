@@ -45,7 +45,7 @@ The disc got livelier and warmer without losing an ounce of lore.
 - **State persistence** — your session (toggles, time, camera, everything) is saved to `localStorage` and restored on reload. URL parameters always override. A *Reset all settings* link lives in the About modal.
 - **Shareable URLs** — the full sim state serializes to query parameters (see [URL Parameters](#url-parameters)); postcards write a shareable link into the address bar.
 - **✦ POSTCARDS** — five preset framings, one click each: *Midnight Sun*, *Falls at Dusk*, *December Rush*, *Beyond the Wall*, *Blood Moon*.
-- **Eclipse finder** — the **ECLIPSE ⏩** button (TIME section) solves for the next Shadow-Object lunar eclipse, jumps to two sim-hours before it at 0.5× speed, and switches the Shadow Object on. Watch the moon turn blood-red as the Shadow Object slides between sun and moon. Also reachable via `?eclipse=1`.
+- **Eclipse finder** — the **ECLIPSE ⏩** button (moved to the ALMANAC section in v1.2) solves for the next Shadow-Object lunar eclipse, jumps to two sim-hours before it at 0.5× speed, and switches the Shadow Object on. Watch the moon turn blood-red as the Shadow Object slides between sun and moon. Also reachable via `?eclipse=1`.
 - **Ground view** — LOOK section radio (Diorama / Ground): stand on the disc surface. In the flat model the sun never sets; it only shrinks into the distance. RESET CAM respects whichever view you're in.
 - **Day/night sky gradient** — a full-screen warm tint and star fading driven by where your camera faces relative to the sun.
 - **Twilight ring** — a warm orange band rings the sun's day patch.
