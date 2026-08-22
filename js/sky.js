@@ -396,15 +396,13 @@ export function updateSky(sky, clock, toggles) {
   glitterMesh.position.x = sx;
   glitterMesh.position.z = sz;
   glitterMesh.material.map.offset.x = (clock.simTime * 0.11) % 1;
-  glitterMesh.material.map.offset.y = (clock.simTime * 0.07) % 1;
-  glitterMesh.material.map.needsUpdate = true;
+  glitterMesh.material.map.offset.y = (clock.simTime * 0.07) % 1; // offset is a uniform; no re-upload needed
 
   // ── Aurora curtains — scroll texture + sway ───────────────────────────────
   auroraGroup.visible = (toggles.aurora !== false);
   if (auroraGroup.visible) {
     auroraPlanes.forEach((plane, i) => {
       plane.material.map.offset.x = (clock.simTime * plane.userData.speed) % 1;
-      plane.material.map.needsUpdate = true;
       plane.rotation.z = plane.userData.baseTilt + Math.sin(clock.simTime * 0.8 + i) * 0.05;
     });
   }

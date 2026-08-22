@@ -7,7 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SimClock, CONSTANTS } from './sim.js';
 import { buildWorld, buildRain, updateRain, updateFrost } from './world.js';
 import { buildSky, updateSky, updateMeteors } from './sky.js';
-import { initUI, updateUI, isGroundMode } from './ui.js';
+import { initUI, updateUI } from './ui.js';
 import { buildOverlays, maybeUpdateObserverBox, buildCityLights, maybeUpdateCityLights, buildTraffic, updateTraffic } from './overlays.js';
 import { initAudio, setAudioEnabled, setEdgeMode as audioSetEdgeMode, setDayFactor, setRainIntensity, setEdgeProximity } from './audio.js';
 import { applyState as applySchemaState, captureState as captureSchemaState, serializeState, parseUrlState } from './state.js';
@@ -77,18 +77,13 @@ const cityLights = buildCityLights(scene);
 const traffic    = buildTraffic(scene, overlays.routeCurves);
 const rain       = buildRain(scene);
 
-// ── Fog (only for infinite edge mode) ─────────────────────────────────────────
-const fogColor = 0x1a2a3a;
-const fog = new THREE.Fog(fogColor, 18, 45);
-// We'll toggle scene.fog on/off based on edge mode
-
-// Patch world.setEdgeMode to also toggle fog and update audio
-const originalSetEdgeMode = world.setEdgeMode.bind(world);
-world.setEdgeMode = (mode) => {
-  originalSetEdgeMode(mode);
+// ── Edge mode: world geometry + fog + audio through one entry point ───────────
+const fog = new THREE.Fog(0x1a2a3a, 18, 45); // only the infinite plane gets fog
+function setEdgeMode(mode) {
+  world.setEdgeMode(mode);
   scene.fog = mode === 'infinite' ? fog : null;
   audioSetEdgeMode(mode);
-};
+}
 
 // ── Photo save flag ───────────────────────────────────────────────────────────
 let photoSaveRequested = false;
@@ -142,7 +137,10 @@ const applyState   = params => applySchemaState(params, stateCtx);
 const captureState = ()     => captureSchemaState(stateCtx);
 
 // ── UI ────────────────────────────────────────────────────────────────────────
-const toggles = initUI(sim, world, sky, composer, pixelPass, camera, controls, applyState, serializeState, setViewMode, requestPhotoSave);
+const { toggles, jumpToEclipse } = initUI({
+  sim, world, sky, pixelPass, camera, controls,
+  applyState, serializeState, setViewMode, setEdgeMode, requestPhotoSave,
+});
 
 // ── localStorage persistence ───────────────────────────────────────────────────
 const LS_KEY = 'fes-state';
@@ -187,10 +185,7 @@ controls.addEventListener('end', scheduleSave);
   if (Object.keys(urlState).length) applyState(urlState);
 
   // eclipse=1: action param — find+jump to next eclipse after other state is applied
-  const qp = new URLSearchParams(location.search);
-  if (qp.get('eclipse') === '1' && typeof initUI._jumpToEclipse === 'function') {
-    initUI._jumpToEclipse();
-  }
+  if (new URLSearchParams(location.search).get('eclipse') === '1') jumpToEclipse();
 }
 
 // ── Deferred audio: if audio was restored from state but no gesture yet ────────

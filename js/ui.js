@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CONSTANTS, SimClock, findNextLunarEclipse, findNextFullMoon, findNextSolstice, activeShower } from './sim.js';
-import { initAudio, setAudioEnabled, setEdgeMode as audioSetEdgeMode } from './audio.js';
+import { initAudio, setAudioEnabled } from './audio.js';
 
 const LORE_TIPS = {
   // Heavens toggles
@@ -64,9 +64,7 @@ const LORE = {
   constellations: "Lamps hung on the underside of the dome, turning once per sidereal day. The Hub circles Polaris — the one nail that never moves.",
 };
 
-// Shared ground-mode flag readable by main.js animate loop
 let _groundMode = false;
-export function isGroundMode() { return _groundMode; }
 
 const INITIAL_CAM = new THREE.Vector3(14, 9, 14);
 
@@ -103,7 +101,11 @@ function updateDayLabel(d) {
   }
 }
 
-export function initUI(sim, world, sky, composer, pixelPass, camera, controls, applyState, serializeState, setViewMode, requestPhotoSave) {
+// ctx: { sim, world, sky, pixelPass, camera, controls, applyState, serializeState,
+//        setViewMode, setEdgeMode, requestPhotoSave }
+// Returns { toggles, jumpToEclipse }.
+export function initUI(ctx) {
+  const { sim, world, pixelPass, camera, controls, applyState, serializeState, setViewMode, setEdgeMode, requestPhotoSave } = ctx;
   const toggles = { dome: true, clouds: true, sunBeam: true, shadowObject: false, aurora: true, view: 'diorama', routes: false, observers: false, model: 'monopole', traffic: true, lights: true, rain: true, constellations: true };
   let currentEdge = 'icewall';
 
@@ -123,18 +125,32 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     }
   }
 
-  // ── Eclipse jump (shared by NEXT ECLIPSE button, postcard, and URL param) ────
+  // ── Speed / pause (one place writes the slider, its label and the button) ──
+  const btnPause    = document.getElementById('btn-pause');
+  const sliderSpeed = document.getElementById('slider-speed');
+  const labelSpeed  = document.getElementById('label-speed');
+  function syncPauseUI() {
+    if (btnPause) btnPause.textContent = sim.paused ? 'RESUME' : 'PAUSE';
+    if (labelSpeed && sliderSpeed) labelSpeed.textContent = sim.paused ? 'PAUSED' : sliderSpeed.value + '×';
+  }
+  // v = slider value (0 = paused, 1 = 1×)
+  function setSpeed(v) {
+    if (sliderSpeed && parseFloat(sliderSpeed.value) !== v) sliderSpeed.value = v;
+    if (v === 0) {
+      sim.paused = true;
+    } else {
+      sim.paused = false;
+      sim.speed = v * CONSTANTS.DEFAULT_SIM_SPEED;
+    }
+    syncPauseUI();
+  }
+
+  // ── Eclipse jump (shared by the almanac button, postcard, and URL param) ──
   function jumpToEclipse() {
     const T = findNextLunarEclipse(sim.simTime);
     if (T !== null) {
-      sim.simTime = T - 2;     // 2 sim-hours before eclipse peak
-      sim.paused = false;
-      sim.speed = 0.5 * CONSTANTS.DEFAULT_SIM_SPEED; // 0.5× on the speed slider
-      // Sync speed slider
-      const ss = document.getElementById('slider-speed');
-      if (ss) ss.value = 0.5;
-      const bp = document.getElementById('btn-pause');
-      if (bp) bp.textContent = 'Pause';
+      sim.simTime = T - 2;     // 2 sim-hours before eclipse onset
+      setSpeed(0.5);
       // Force-enable Shadow Object through the existing toggle + checkbox
       const cs = document.getElementById('chk-shadow');
       if (cs && !cs.checked) {
@@ -146,10 +162,6 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
       updateLore('eclipseNone');
     }
   }
-
-  // ── Expose jumpToEclipse for URL param use ────────────────────────────────
-  // Called by main.js after initUI returns if eclipse=1 in URL params.
-  initUI._jumpToEclipse = jumpToEclipse;
 
   // Collapse button
   const panel = document.getElementById('right-panel');
@@ -336,19 +348,17 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     if (el) {
       el.addEventListener('change', () => {
         currentEdge = mode;
-        world.setEdgeMode(mode);
-        audioSetEdgeMode(mode);
+        setEdgeMode(mode);
         updateLore();
       });
     }
   });
 
   // Pause button
-  const btnPause = document.getElementById('btn-pause');
   if (btnPause) {
     btnPause.addEventListener('click', () => {
       sim.paused = !sim.paused;
-      btnPause.textContent = sim.paused ? 'Resume' : 'Pause';
+      syncPauseUI();
     });
   }
 
@@ -357,7 +367,7 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     updateDayLabel(sim.day);
     const sd = document.getElementById('slider-day');
     if (sd && document.activeElement !== sd) sd.value = sim.day;
-    if (btnPause) btnPause.textContent = 'Pause';
+    syncPauseUI();
   }
 
   const btnAlmEclipse = document.getElementById('btn-alm-eclipse');
@@ -385,19 +395,8 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
   }
 
   // Speed slider
-  const sliderSpeed = document.getElementById('slider-speed');
   if (sliderSpeed) {
-    sliderSpeed.addEventListener('input', e => {
-      const v = parseFloat(e.target.value);
-      if (v === 0) {
-        sim.paused = true;
-        if (btnPause) btnPause.textContent = 'Resume';
-      } else {
-        sim.paused = false;
-        sim.speed = v * CONSTANTS.DEFAULT_SIM_SPEED;
-        if (btnPause) btnPause.textContent = 'Pause';
-      }
-    });
+    sliderSpeed.addEventListener('input', e => setSpeed(parseFloat(e.target.value)));
   }
 
   // Day slider
@@ -413,9 +412,11 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
 
   // Pixel slider
   const sliderPixel = document.getElementById('slider-pixel');
+  const labelPixel  = document.getElementById('label-pixel');
   if (sliderPixel) {
     sliderPixel.addEventListener('input', e => {
       pixelPass.setPixelSize(parseInt(e.target.value));
+      if (labelPixel) labelPixel.textContent = e.target.value;
     });
   }
 
@@ -602,11 +603,12 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     });
   }
 
-  // Set initial lore
+  // Set initial lore + readouts
   updateLore();
   updateDayLabel(sim.day);
+  syncPauseUI();
 
-  return toggles;
+  return { toggles, jumpToEclipse };
 }
 
 // ── Almanac refresh (throttled, cached across the ~400-sim-day eclipse scan) ──
@@ -666,30 +668,28 @@ function refreshAlmanac(sim) {
   }
 }
 
+// Per-frame readouts; DOM writes only when the displayed text actually changes.
+const _lastText = {};
+function setTextIfChanged(id, text) {
+  if (_lastText[id] === text) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  _lastText[id] = text;
+}
+
 export function updateUI(sim, world, toggles) {
   const h = Math.floor(sim.timeOfDay);
   const m = Math.floor((sim.timeOfDay % 1) * 60);
   const d = sim.day;
 
-  const clockEl = document.getElementById('clock-display');
-  if (clockEl) {
-    clockEl.textContent =
-      'Day ' + d + ' · ' + pad(h) + ':' + pad(m) +
-      ' · ' + SimClock.monthName(d) + ' · ' + SimClock.seasonName(d);
-  }
-
-  const speedEl = document.getElementById('sun-speed');
-  if (speedEl) {
-    speedEl.textContent = 'Sun: ' + Math.round(sim.sunSpeedMph).toLocaleString() + ' mph';
-  }
-
-  const dayLabel = document.getElementById('label-day');
-  if (dayLabel) {
-    dayLabel.textContent = 'Day ' + d + ' · ' + SimClock.monthName(d) + ' · ' + SimClock.seasonName(d);
-  }
+  setTextIfChanged('clock-display',
+    'Day ' + d + ' · ' + pad(h) + ':' + pad(m) + ' · ' + SimClock.monthName(d) + ' · ' + SimClock.seasonName(d));
+  setTextIfChanged('sun-speed', 'Sun: ' + Math.round(sim.sunSpeedMph).toLocaleString() + ' mph');
+  setTextIfChanged('label-day', 'Day ' + d + ' · ' + SimClock.monthName(d) + ' · ' + SimClock.seasonName(d));
 
   const daySlider = document.getElementById('slider-day');
-  if (daySlider && document.activeElement !== daySlider) {
+  if (daySlider && document.activeElement !== daySlider && parseInt(daySlider.value) !== d) {
     daySlider.value = d;
   }
 
