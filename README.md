@@ -274,3 +274,9 @@ Three.js ≥ r167 is a **split build**: `three.module.js` re-exports from `three
 - Blake Marnell: *Flat Earth Sun, Moon & Zodiac Clock* app
 - Samuel Rowbotham: *Zetetic Astronomy: Earth Not a Globe* (1865) — the firmament, the receding sun, the ice barrier
 - Orlando Ferguson: *Map of the Square and Stationary Earth* (1893) — early systematic monopole map
+
+---
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). Three.js is MIT (vendored, 0.180.0); the Press Start 2P font is under the SIL Open Font License 1.1 ([assets/PressStart2P-OFL.txt](assets/PressStart2P-OFL.txt)).
