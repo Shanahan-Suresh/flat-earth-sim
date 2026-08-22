@@ -7,7 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SimClock, CONSTANTS } from './sim.js';
 import { buildWorld, buildRain, updateRain, updateFrost } from './world.js';
 import { buildSky, updateSky, updateMeteors } from './sky.js';
-import { initUI, updateUI } from './ui.js';
+import { initUI, updateUI, setPanelCollapsed } from './ui.js';
 import { buildOverlays, maybeUpdateObserverBox, buildCityLights, maybeUpdateCityLights, buildTraffic, updateTraffic } from './overlays.js';
 import { initAudio, setAudioEnabled, setEdgeMode as audioSetEdgeMode, setDayFactor, setRainIntensity, setEdgeProximity } from './audio.js';
 import { applyState as applySchemaState, captureState as captureSchemaState, serializeState, parseUrlState } from './state.js';
@@ -139,7 +139,7 @@ const captureState = ()     => captureSchemaState(stateCtx);
 // ── UI ────────────────────────────────────────────────────────────────────────
 const { toggles, jumpToEclipse } = initUI({
   sim, world, sky, pixelPass, camera, controls,
-  applyState, serializeState, setViewMode, setEdgeMode, requestPhotoSave,
+  applyState, captureState, serializeState, setViewMode, setEdgeMode, requestPhotoSave,
 });
 
 // ── localStorage persistence ───────────────────────────────────────────────────
@@ -179,13 +179,22 @@ controls.addEventListener('end', scheduleSave);
   const stored = loadStoredState();
   if (stored) applyState(stored);
 
-  // URL params always win (cam is applied last by the schema, so an explicit
-  // cam overrides the ground-view default standing spot)
+  // URL params win over the stored state (cam is applied last by the schema,
+  // so an explicit cam overrides the ground-view default standing spot)
   const urlState = parseUrlState(location.search);
   if (Object.keys(urlState).length) applyState(urlState);
 
-  // eclipse=1: action param — find+jump to next eclipse after other state is applied
-  if (new URLSearchParams(location.search).get('eclipse') === '1') jumpToEclipse();
+  // Action params, applied after the state:
+  //   eclipse=1  — find + jump to the next Shadow-Object eclipse
+  //   panel=open|closed — force the right panel (mobile starts collapsed)
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('eclipse') === '1') jumpToEclipse();
+  if (qp.get('panel') === 'open' || qp.get('panel') === 'closed') setPanelCollapsed(qp.get('panel') === 'closed');
+
+  // URL params are one-shot: strip them so later changes (saved to
+  // localStorage) are not overridden by a stale query on reload. Sharing
+  // goes through the COPY LINK button, which serialises the live state.
+  if (location.search) history.replaceState(null, '', location.pathname);
 }
 
 // ── Deferred audio: if audio was restored from state but no gesture yet ────────

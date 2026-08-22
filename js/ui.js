@@ -66,6 +66,16 @@ const LORE = {
 
 let _groundMode = false;
 
+// Right-panel collapse state; the [+]/[–] button, main.js (panel= param) and
+// the small-screen default all go through here.
+export function setPanelCollapsed(collapsed) {
+  const panel = document.getElementById('right-panel');
+  const btn = document.getElementById('btn-collapse');
+  if (!panel) return;
+  panel.classList.toggle('collapsed', collapsed);
+  if (btn) btn.textContent = collapsed ? '[+]' : '[–]';
+}
+
 const INITIAL_CAM = new THREE.Vector3(14, 9, 14);
 
 // ── Preset Postcards ──────────────────────────────────────────────────────────
@@ -105,7 +115,7 @@ function updateDayLabel(d) {
 //        setViewMode, setEdgeMode, requestPhotoSave }
 // Returns { toggles, jumpToEclipse }.
 export function initUI(ctx) {
-  const { sim, world, pixelPass, camera, controls, applyState, serializeState, setViewMode, setEdgeMode, requestPhotoSave } = ctx;
+  const { sim, world, pixelPass, camera, controls, applyState, captureState, serializeState, setViewMode, setEdgeMode, requestPhotoSave } = ctx;
   const toggles = { dome: true, clouds: true, sunBeam: true, shadowObject: false, aurora: true, view: 'diorama', routes: false, observers: false, model: 'monopole', traffic: true, lights: true, rain: true, constellations: true };
   let currentEdge = 'icewall';
 
@@ -163,14 +173,12 @@ export function initUI(ctx) {
     }
   }
 
-  // Collapse button
+  // Collapse button (small screens start collapsed — see setPanelCollapsed)
   const panel = document.getElementById('right-panel');
   const btnCollapse = document.getElementById('btn-collapse');
   if (btnCollapse && panel) {
-    btnCollapse.addEventListener('click', () => {
-      const collapsed = panel.classList.toggle('collapsed');
-      btnCollapse.textContent = collapsed ? '[+]' : '[–]';
-    });
+    btnCollapse.addEventListener('click', () => setPanelCollapsed(!panel.classList.contains('collapsed')));
+    if (window.matchMedia('(max-width: 640px)').matches) setPanelCollapsed(true);
   }
 
   // Dome toggle
@@ -497,6 +505,24 @@ export function initUI(ctx) {
     }
   });
 
+  // COPY LINK — the live state as a shareable URL (URL params are one-shot on load)
+  const btnCopyLink = document.getElementById('btn-copy-link');
+  if (btnCopyLink && captureState && serializeState) {
+    const idleLabel = btnCopyLink.textContent;
+    let resetTimer = null;
+    btnCopyLink.addEventListener('click', async () => {
+      const url = location.origin + location.pathname + '?' + serializeState(captureState());
+      let ok = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(url); ok = true; }
+      } catch (_) { /* fall through to prompt */ }
+      if (!ok) window.prompt('Copy this link:', url);
+      btnCopyLink.textContent = ok ? 'COPIED' : idleLabel;
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => { btnCopyLink.textContent = idleLabel; }, 1500);
+    });
+  }
+
   // About modal
   const btnAbout = document.getElementById('btn-about');
   const modalAbout = document.getElementById('modal-about');
@@ -550,9 +576,7 @@ export function initUI(ctx) {
         btn.textContent = preset.label;
         btn.addEventListener('click', () => {
           if (preset.eclipse) {
-            // Eclipse preset: run the finder+jump, update URL with eclipse=1 action param
             jumpToEclipse();
-            history.replaceState(null, '', '?eclipse=1');
           } else {
             applyState(preset.params);
             // Sync the lore/edge state after preset applies
@@ -561,8 +585,6 @@ export function initUI(ctx) {
               currentEdge = edgeEl.value;
               updateLore();
             }
-            // Update address bar
-            history.replaceState(null, '', '?' + serializeState(preset.params));
           }
         });
         wrap.appendChild(btn);
