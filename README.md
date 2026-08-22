@@ -24,6 +24,10 @@ A real-time 3D diorama of the flat-earth consensus model as described by [TFES (
 
 ---
 
+## What's new in v1.3 — the Honest Update
+
+- **Map scale fixed.** v1.1's "true AE" map squeezed 180° of latitude into 86% of the disc, so the lore sun (4,600 mi path in June) sat over 12°N instead of the Tropic of Cancer, and 42°S in December instead of Capricorn. The south pole now sits at the disc edge — Antarctica *is* the rim, which is the lore — and the continents, routes, observers and city lights all moved outward ~16% to match. Faint dashed tropic circles mark the sun's turning paths; a unit test pins Cancer/Capricorn under the solstice sun paths. Sydney–Santiago's flat distance is now 15,974 mi.
+
 ## What's new in v1.2 — the Cozy Update
 
 The disc got livelier and warmer without losing an ounce of lore.
@@ -51,7 +55,7 @@ The disc got livelier and warmer without losing an ounce of lore.
 - **Twilight ring** — a warm orange band rings the sun's day patch.
 - **Aurora curtains** — eight additive light ribbons dance over the ice wall (THE HEAVENS ▸ Aurora).
 - **Sun glitter** — a sparkle patch glints on the ocean beneath the sun.
-- **Flight routes overlay** — four real southern/northern routes drawn straight on the AE map, with a distance box comparing flat-map distance to real airline distance (Sydney–Santiago: flat 13,728 mi vs real 7,060 mi in ~12.5 h — the model's most famous stretch).
+- **Flight routes overlay** — four real southern/northern routes drawn straight on the AE map, with a distance box comparing flat-map distance to real airline distance (Sydney–Santiago: flat 13,728 mi vs real 7,060 mi in ~12.5 h — the model's most famous stretch; 15,974 mi since the v1.3 scale fix).
 - **Sky observers** — KL / London / NYC pins on the disc with a live box showing each observer's local solar time and ☀/☾ day-night status.
 - **Bipolar model** — MODEL radio toggles a rival two-pole flat map. Route/observer overlays auto-disable (they're projected for the monopole map).
 - **Lore tooltips** — hover any control for two or three sentences of faithful lore, sourced like everything else.
@@ -158,7 +162,7 @@ Example: `?day=191&time=21.7&shadow=1&speed=0` — a blood moon, paused.
 | Lore constant | Value |
 |---|---|
 | Disc radius | 12,450 mi (10 units; 1 unit = 1,245 mi) |
-| Map projection | Azimuthal equidistant — north pole at center, south pole at the ice ring |
+| Map projection | Azimuthal equidistant on the full disc — north pole at center, south pole at the disc edge (Antarctica is the rim); 180° of latitude = 12,450 mi, so the June sun rides the Tropic of Cancer and the December sun the Tropic of Capricorn |
 | Ice wall height | ~150 ft lore (exaggerated for visibility) |
 | Sun diameter | 32 mi (lore); upscaled ~13× for visibility |
 | Moon diameter | 32 mi (lore); self-luminous cold light |

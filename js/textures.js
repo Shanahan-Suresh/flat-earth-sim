@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CONSTANTS, latLonToDisc } from './sim.js';
 
 export function applyNearestFilter(texture) {
   texture.magFilter = THREE.NearestFilter;
@@ -26,56 +27,54 @@ export function makeWorldMapTexture() {
     ctx.fill();
   }
 
+  // Canvas px per scene unit: the 256 px half-width is the 10-unit disc radius.
+  const PX_PER_UNIT = 256 / CONSTANTS.DISC_RADIUS;
+  // Same projection as everything else on the disc (routes, observers, cities):
+  // latLonToDisc in sim.js, converted to canvas pixels. South pole = canvas edge.
   function latLonToPixel(lat, lon) {
-    // Azimuthal equidistant: north pole (lat 90) at center, south pole (lat -90)
-    // at the inner edge of the ice ring (r=220px). Full 180° of latitude spans 220px.
-    const radius_px = (90 - lat) / 180 * 220;
-    const angle = lon * Math.PI / 180;
-    return {
-      x: 256 + radius_px * Math.sin(angle),
-      y: 256 - radius_px * Math.cos(angle),
-    };
+    const p = latLonToDisc(lat, lon);
+    return { x: 256 + p.x * PX_PER_UNIT, y: 256 + p.z * PX_PER_UNIT };
   }
+  const latRadiusPx = lat => (90 - lat) / 180 * 256;
 
-  // Blob radii retuned (~×0.6) for the corrected /180 projection, which packs
-  // the continents into a smaller central area than the old /90 formula did.
+  // Continent blobs (radii sized for the full-disc projection)
   // North America
   const na = latLonToPixel(55, -100);
-  drawCircle(na.x, na.y, 33, '#6db35a');
+  drawCircle(na.x, na.y, 38, '#6db35a');
 
   // Greenland
   const gl = latLonToPixel(72, -42);
-  drawCircle(gl.x, gl.y, 11, '#7cc06a');
+  drawCircle(gl.x, gl.y, 13, '#7cc06a');
 
   // Europe
   const eu = latLonToPixel(52, 15);
-  drawCircle(eu.x, eu.y, 18, '#66a85a');
+  drawCircle(eu.x, eu.y, 21, '#66a85a');
 
   // Russia/Asia — multiple overlapping circles
   const ca = latLonToPixel(50, 80);
-  drawCircle(ca.x, ca.y, 27, '#6db35a');
+  drawCircle(ca.x, ca.y, 31, '#6db35a');
   const ea = latLonToPixel(40, 120);
-  drawCircle(ea.x, ea.y, 23, '#63a856');
+  drawCircle(ea.x, ea.y, 27, '#63a856');
   const sb = latLonToPixel(65, 100);
-  drawCircle(sb.x, sb.y, 24, '#74bc60');
+  drawCircle(sb.x, sb.y, 28, '#74bc60');
 
   // Africa
   const af = latLonToPixel(5, 20);
-  drawCircle(af.x, af.y, 27, '#5fae50');
+  drawCircle(af.x, af.y, 31, '#5fae50');
 
   // South America
   const sa = latLonToPixel(-15, -60);
-  drawCircle(sa.x, sa.y, 24, '#6cba58');
+  drawCircle(sa.x, sa.y, 28, '#6cba58');
 
   // Australia
   const au = latLonToPixel(-25, 133);
-  drawCircle(au.x, au.y, 17, '#70b25e');
+  drawCircle(au.x, au.y, 20, '#70b25e');
 
   // Land texture speckles — slightly lighter/darker dots over land areas
   const speckleColors = ['#7cc468', '#58a04c', '#86ce72'];
   for (let i = 0; i < 300; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * 170; // keep speckles inside the (now smaller) land zone
+    const dist = Math.random() * 198; // keep speckles inside the land zone (north of ~50°S)
     const sx = 256 + dist * Math.cos(angle);
     const sy = 256 + dist * Math.sin(angle);
     const sc = speckleColors[Math.floor(Math.random() * speckleColors.length)];
@@ -86,31 +85,41 @@ export function makeWorldMapTexture() {
     ctx.fill();
   }
 
-  // Ice ring (Antarctica edge band): annular ring from r=220 to r=230
-  // Pushed cold/blue so it still reads as ice under warm ambient light
+  // Antarctica: the rim band from ~70°S out to the south pole at the disc edge.
+  // Two tones — coast then ice sheet; the ice-wall meshes stand at 9.9 units,
+  // i.e. inside the outer (brighter) band. Pushed cold/blue so it still reads
+  // as ice under warm ambient light.
   ctx.beginPath();
-  ctx.arc(256, 256, 230, 0, Math.PI * 2);
-  ctx.arc(256, 256, 220, 0, Math.PI * 2, true);
+  ctx.arc(256, 256, 244, 0, Math.PI * 2);
+  ctx.arc(256, 256, latRadiusPx(-70), 0, Math.PI * 2, true);
   ctx.fillStyle = '#c8ecff';
   ctx.fill();
 
-  // Slightly lighter outer edge
   ctx.beginPath();
-  ctx.arc(256, 256, 240, 0, Math.PI * 2);
-  ctx.arc(256, 256, 230, 0, Math.PI * 2, true);
+  ctx.arc(256, 256, 256, 0, Math.PI * 2);
+  ctx.arc(256, 256, 244, 0, Math.PI * 2, true);
   ctx.fillStyle = '#e4f8ff';
   ctx.fill();
 
   // Latitude gridlines
   ctx.strokeStyle = 'rgba(0,80,120,0.25)';
   ctx.lineWidth = 1;
-  const latLines = [60, 30, 0, -30, -60];
-  for (const lat of latLines) {
-    const r = (90 - lat) / 180 * 220;
+  for (const lat of [60, 30, 0, -30, -60]) {
     ctx.beginPath();
-    ctx.arc(256, 256, r, 0, Math.PI * 2);
+    ctx.arc(256, 256, latRadiusPx(lat), 0, Math.PI * 2);
     ctx.stroke();
   }
+
+  // Tropics (dashed): the sun's turning circles — its June path rides the
+  // Tropic of Cancer, its December path the Tropic of Capricorn.
+  ctx.strokeStyle = 'rgba(255,200,80,0.35)';
+  ctx.setLineDash([3, 3]);
+  for (const lat of [CONSTANTS.SUN_DECLINATION_AMP, -CONSTANTS.SUN_DECLINATION_AMP]) {
+    ctx.beginPath();
+    ctx.arc(256, 256, latRadiusPx(lat), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
 
   // North Pole white dot
   drawCircle(256, 256, 12, '#e8f4f8');
@@ -445,16 +454,16 @@ export function makeBipolarMapTexture() {
   drawCircle(RP.x - 20, RP.y - 40, 20, '#6db35a'); // SE Asia / Pacific
   drawCircle(RP.x + 60, RP.y + 10, 18, '#66a85a'); // Madagascar/India area
 
-  // Same ice ring as monopole — same px 220–240 radius from CANVAS CENTER
+  // Same rim ice band as the monopole map (227–256 px from the canvas centre)
   ctx.beginPath();
-  ctx.arc(256, 256, 230, 0, Math.PI * 2);
-  ctx.arc(256, 256, 220, 0, Math.PI * 2, true);
+  ctx.arc(256, 256, 244, 0, Math.PI * 2);
+  ctx.arc(256, 256, 227, 0, Math.PI * 2, true);
   ctx.fillStyle = '#c8ecff';
   ctx.fill();
 
   ctx.beginPath();
-  ctx.arc(256, 256, 240, 0, Math.PI * 2);
-  ctx.arc(256, 256, 230, 0, Math.PI * 2, true);
+  ctx.arc(256, 256, 256, 0, Math.PI * 2);
+  ctx.arc(256, 256, 244, 0, Math.PI * 2, true);
   ctx.fillStyle = '#e4f8ff';
   ctx.fill();
 

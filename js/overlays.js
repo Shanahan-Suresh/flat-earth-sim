@@ -32,7 +32,7 @@ const OBSERVER_COLORS = { KL: '#ffcc00', LON: '#cc4444', NYC: '#4488ff' };
 // Route distance comparison lives in the #routes-box DOM panel (bottom-left,
 // stacked above #observer-box). 3D sprite text cannot survive the
 // RenderPixelatedPass downsampling, so the labels are HTML, not textures.
-// One row per route: `SYD–SCL  flat 13,730 mi · real 7,060 mi ~12.5h`
+// One row per route: `SYD–SCL  flat 15,974 mi · real 7,060 mi ~12.5h`
 // (flat number yellow, real cyan). Populated once at build time.
 function populateRoutesBox() {
   const box = document.getElementById('routes-box');

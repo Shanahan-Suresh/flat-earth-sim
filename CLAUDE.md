@@ -54,7 +54,7 @@ Always serve from HTTP. `file://` blocks ES module imports. The importmap in `in
 - No bundler, no framework, no npm. Plain ES modules.
 - All textures are procedural Canvas 2D — no binary image assets except the font (`assets/PressStart2P.ttf`).
 - **All lore values live in `CONSTANTS` in `js/sim.js`** with source comments. Change lore there, not in scene code.
-- **Map projection is true azimuthal equidistant**: `radius_px = (90 − lat) / 180 × 220` on the 512px canvas — north pole at canvas center, south pole at the ice-ring inner edge (r=220px). `latLonToDisc()` in `js/sim.js` and `makeWorldMapTexture()` in `js/textures.js` must stay in lockstep; anything placed by lat/lon (routes, observers) goes through `latLonToDisc()`.
+- **Map projection is true azimuthal equidistant on the full disc**: `r = (90 − lat) / 180 × DISC_RADIUS` — north pole at the centre, south pole at the disc edge (Antarctica is the rim band, lat ≤ −70°), so 180° of latitude = 12,450 mi = the same mile scale as the sun-path constants (Cancer at 3.7 units under the June sun, Capricorn at 6.3 under the December sun). `latLonToDisc()` in `js/sim.js` is the only projection; `makeWorldMapTexture()` converts its units to canvas px (`256 / DISC_RADIUS` px per unit). Anything placed by lat/lon (map, routes, observers, cities, ships) goes through it. v1.1–1.2 squeezed 180° into 220 of 256 px and put the June sun over 12°N; `test/sim.test.js` pins the fix.
 - Importmap in `index.html` wires the module specifiers to `vendor/`.
 - `vendor/` is intentionally committed (pinned three.js 0.180.0, no CDN dependency).
 

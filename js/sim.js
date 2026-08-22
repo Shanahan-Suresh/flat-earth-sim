@@ -379,16 +379,14 @@ export function frostFactor(day) {
   return (1 + Math.cos(2 * Math.PI * (day - CONSTANTS.FROST_PEAK_DAY) / 365)) / 2;
 }
 
+// Azimuthal equidistant projection onto the disc: north pole (lat 90) at the
+// centre, south pole (lat -90) at the disc edge — Antarctica IS the rim / ice
+// wall. 180° of latitude = DISC_RADIUS = 12,450 mi, the same mile scale the
+// sun-path constants use (Cancer at 3.7 units, Capricorn at 6.3). Everything
+// placed by lat/lon (map texture, routes, observers, cities, ships) goes
+// through here; makeWorldMapTexture converts units → canvas px.
 export function latLonToDisc(lat, lon) {
-  // Azimuthal equidistant, matching makeWorldMapTexture's latLonToPixel:
-  // north pole (lat 90) at disc center, south pole (lat -90) at the inner
-  // ice-ring edge (220px on the 512px canvas). Canvas 256px half-width maps
-  // to the 10-unit disc radius, so scale = 10/256 world units per pixel.
-  const radius_px = (90 - lat) / 180 * 220;
-  const lonRad = lon * Math.PI / 180;
-  const scale = 10 / 256; // world units per canvas pixel
-  return {
-    x: radius_px * Math.sin(lonRad) * scale,
-    z: -(radius_px * Math.cos(lonRad) * scale),
-  };
+  const r = (90 - lat) / 180 * CONSTANTS.DISC_RADIUS;
+  const lonRad = lon * DEG;
+  return { x: r * Math.sin(lonRad), z: -(r * Math.cos(lonRad)) };
 }

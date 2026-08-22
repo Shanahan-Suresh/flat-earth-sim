@@ -16,7 +16,7 @@ One Conventional Commit per step, on `main`. Push only at the end (deploys GitHu
 - [x] 2. `refactor(sim)`: pure `*At(t)` helpers; getters + finders delegate; `DEFAULT_SIM_SPEED` in ui.js
 - [x] 3. `refactor(state)`: `js/state.js` schema; `test/state.test.js`; main.js lists removed
 - [x] 4. `refactor(ui)`: initUI context/handles; single `setEdgeMode`; slider labels; pause text; sky.js needsUpdate lines
-- [ ] 5. `fix(map)`: 180° onto full disc; Antarctica band 227–256 px; tropic circles; bipolar ring; docs numbers
+- [x] 5. `fix(map)`: 180° onto full disc; Antarctica band 227–256 px; tropic circles; bipolar ring; docs numbers
 - [ ] 6. `docs(lore)`: doctrine vs flavour (README, About, tooltips)
 - [ ] 7. `feat(scene)`: `js/rng.js` seeded build RNG
 - [ ] 8. `feat(ui)`: COPY LINK; one-shot URL params; postcards stop writing address bar
