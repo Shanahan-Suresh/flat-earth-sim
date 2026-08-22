@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SimClock, findNextLunarEclipse, findNextFullMoon, findNextSolstice, activeShower } from './sim.js';
+import { CONSTANTS, SimClock, findNextLunarEclipse, findNextFullMoon, findNextSolstice, activeShower } from './sim.js';
 import { initAudio, setAudioEnabled, setEdgeMode as audioSetEdgeMode } from './audio.js';
 
 const LORE_TIPS = {
@@ -129,7 +129,7 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
     if (T !== null) {
       sim.simTime = T - 2;     // 2 sim-hours before eclipse peak
       sim.paused = false;
-      sim.speed = 0.5 * (24 / 12); // 0.5× speed (slider value 0.5 → sim.speed * 24/12)
+      sim.speed = 0.5 * CONSTANTS.DEFAULT_SIM_SPEED; // 0.5× on the speed slider
       // Sync speed slider
       const ss = document.getElementById('slider-speed');
       if (ss) ss.value = 0.5;
@@ -394,7 +394,7 @@ export function initUI(sim, world, sky, composer, pixelPass, camera, controls, a
         if (btnPause) btnPause.textContent = 'Resume';
       } else {
         sim.paused = false;
-        sim.speed = v * (24 / 12);
+        sim.speed = v * CONSTANTS.DEFAULT_SIM_SPEED;
         if (btnPause) btnPause.textContent = 'Pause';
       }
     });

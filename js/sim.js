@@ -161,6 +161,62 @@ export const CONSTANTS = {
   },
 };
 
+// ── Pure position helpers (t = simTime in sim-hours) ─────────────────────────
+// SimClock getters, the almanac finders and the eclipse tint all call these,
+// so the rendered sky and the forward scans can never drift apart.
+const DEG = Math.PI / 180;
+const TWO_PI = Math.PI * 2;
+
+export function dayAt(t) { return Math.floor(t / 24) % 365; }
+export function timeOfDayAt(t) { return t % 24; }
+
+// Solar declination in radians: +23.44° on day 172 (Jun 21), -23.44° on day ~355.
+export function solarDeclinationAt(t) {
+  return CONSTANTS.SUN_DECLINATION_AMP * DEG * Math.cos(TWO_PI * (dayAt(t) - 172) / 365);
+}
+
+// Sun path radius (units): 3.7 at the June solstice (Cancer), 6.3 in December (Capricorn).
+export function sunPathRadiusAt(t) {
+  const norm = solarDeclinationAt(t) / (CONSTANTS.SUN_DECLINATION_AMP * DEG); // -1..1
+  return CONSTANTS.SUN_PATH_BASE - norm * CONSTANTS.SUN_PATH_RANGE;
+}
+
+// Sun angle (radians, clockwise from +X when viewed from above; use -angle for sin/cos)
+export function sunAngleAt(t) { return (timeOfDayAt(t) / 24) * TWO_PI; }
+
+export function sunPosAt(t) {
+  const r = sunPathRadiusAt(t), a = sunAngleAt(t);
+  return { x: r * Math.cos(-a), y: CONSTANTS.SUN_ALTITUDE, z: r * Math.sin(-a) };
+}
+
+export function moonAngleAt(t) { return ((t * CONSTANTS.MOON_RATE_RATIO) / 24) * TWO_PI; }
+
+export function moonPathRadiusAt(t) {
+  return CONSTANTS.SUN_PATH_BASE
+    - CONSTANTS.SUN_PATH_RANGE
+      * Math.cos(TWO_PI * (dayAt(t) - 172) / 365 + CONSTANTS.MOON_PATH_PHASE_OFFSET);
+}
+
+export function moonPosAt(t) {
+  const r = moonPathRadiusAt(t), a = moonAngleAt(t);
+  return { x: r * Math.cos(-a), y: CONSTANTS.MOON_ALTITUDE, z: r * Math.sin(-a) };
+}
+
+// Star wheel rotation (radians); sidereal day, so it gains on the sun.
+export function starAngleAt(t) { return (t / CONSTANTS.SIDEREAL_DAY) * TWO_PI; }
+
+// Shadow Object: orbits the sun's position with a 5× vertical bob (inclination).
+export function shadowObjectPosAt(t) {
+  const a = (t / 24 / CONSTANTS.SHADOW_OBJECT_PERIOD) * TWO_PI;
+  const bob = Math.sin(a * 5) * 0.3;
+  const s = sunPosAt(t);
+  return {
+    x: s.x + CONSTANTS.SHADOW_OBJECT_ORBIT_RADIUS * Math.cos(a),
+    y: CONSTANTS.SUN_ALTITUDE + bob,
+    z: s.z + CONSTANTS.SHADOW_OBJECT_ORBIT_RADIUS * Math.sin(a),
+  };
+}
+
 export class SimClock {
   constructor() {
     this.simTime = 172 * 24 + 12; // start: Jun 21 noon
@@ -173,68 +229,26 @@ export class SimClock {
     if (!this.paused) this.simTime += dtReal * this.speed;
   }
 
-  get day() { return Math.floor(this.simTime / 24) % 365; }
-  get timeOfDay() { return this.simTime % 24; }
-
-  // Solar declination in radians
-  get solarDeclination() {
-    return (CONSTANTS.SUN_DECLINATION_AMP * Math.PI / 180)
-      * Math.cos(2 * Math.PI * (this.day - 172) / 365);
-  }
-
-  // Sun path radius (units on disc)
-  get sunPathRadius() {
-    const dec = this.solarDeclination;
-    const normDec = dec / (CONSTANTS.SUN_DECLINATION_AMP * Math.PI / 180); // -1..1
-    return CONSTANTS.SUN_PATH_BASE - normDec * CONSTANTS.SUN_PATH_RANGE;
-  }
-
-  // Sun angle (radians, clockwise from +X when viewed from above → use -theta for sin)
-  get sunAngle() {
-    return (this.timeOfDay / 24) * 2 * Math.PI;
-  }
-
-  get sunX() { return this.sunPathRadius * Math.cos(-this.sunAngle); }
-  get sunZ() { return this.sunPathRadius * Math.sin(-this.sunAngle); }
-
-  // Moon angular rate relative to sun
-  get moonAngle() {
-    const moonTime = this.simTime * CONSTANTS.MOON_RATE_RATIO;
-    return (moonTime / 24) * 2 * Math.PI;
-  }
-
-  get moonPathRadius() {
-    return CONSTANTS.SUN_PATH_BASE
-      - CONSTANTS.SUN_PATH_RANGE
-        * Math.cos(2 * Math.PI * (this.day - 172) / 365 + CONSTANTS.MOON_PATH_PHASE_OFFSET);
-  }
-
-  get moonX() { return this.moonPathRadius * Math.cos(-this.moonAngle); }
-  get moonZ() { return this.moonPathRadius * Math.sin(-this.moonAngle); }
+  get day() { return dayAt(this.simTime); }
+  get timeOfDay() { return timeOfDayAt(this.simTime); }
+  get solarDeclination() { return solarDeclinationAt(this.simTime); }
+  get sunPathRadius() { return sunPathRadiusAt(this.simTime); }
+  get sunAngle() { return sunAngleAt(this.simTime); }
+  get sunX() { return sunPosAt(this.simTime).x; }
+  get sunZ() { return sunPosAt(this.simTime).z; }
+  get moonAngle() { return moonAngleAt(this.simTime); }
+  get moonPathRadius() { return moonPathRadiusAt(this.simTime); }
+  get moonX() { return moonPosAt(this.simTime).x; }
+  get moonZ() { return moonPosAt(this.simTime).z; }
 
   // Phase angle: 0 = new, π = full
-  get moonPhase() {
-    return this.sunAngle - this.moonAngle; // Δ
-  }
+  get moonPhase() { return this.sunAngle - this.moonAngle; }
 
-  // Star wheel rotation angle (radians)
-  get starAngle() {
-    return (this.simTime / CONSTANTS.SIDEREAL_DAY) * 2 * Math.PI;
-  }
+  get starAngle() { return starAngleAt(this.simTime); }
 
-  // Shadow object (orbits sun)
-  shadowObjectPosition(sunX, sunZ) {
-    const a = (this.simTime / 24 / CONSTANTS.SHADOW_OBJECT_PERIOD) * 2 * Math.PI;
-    const bob = Math.sin(a * 5) * 0.3; // vertical bobbing (inclination)
-    return {
-      x: sunX + CONSTANTS.SHADOW_OBJECT_ORBIT_RADIUS * Math.cos(a),
-      y: CONSTANTS.SUN_ALTITUDE + bob,
-      z: sunZ + CONSTANTS.SHADOW_OBJECT_ORBIT_RADIUS * Math.sin(a),
-    };
-  }
+  shadowObjectPosition() { return shadowObjectPosAt(this.simTime); }
 
-  // Sun ground speed in mph (circumference of current circle / 24h)
-  // 1 unit = 1245 miles
+  // Sun ground speed in mph (circumference of current circle / 24h); 1 unit = 1245 mi
   get sunSpeedMph() {
     return (2 * Math.PI * this.sunPathRadius * 1245) / 24;
   }
@@ -260,66 +274,42 @@ export class SimClock {
 // ── Eclipse math ──────────────────────────────────────────────────────────────
 
 function _normalizeAngle(a) {
-  const TWO_PI = Math.PI * 2;
   return ((a % TWO_PI) + TWO_PI) % TWO_PI;
 }
 
-function _pointToSegmentDist(px, py, pz, ax, ay, az, bx, by, bz) {
-  const abx = bx - ax, aby = by - ay, abz = bz - az;
-  const apx = px - ax, apy = py - ay, apz = pz - az;
+function _pointToSegmentDist(p, a, b) {
+  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+  const apx = p.x - a.x, apy = p.y - a.y, apz = p.z - a.z;
   const ab2 = abx * abx + aby * aby + abz * abz;
   if (ab2 === 0) return Math.sqrt(apx * apx + apy * apy + apz * apz);
   const t = Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / ab2));
-  const cx = ax + t * abx, cy = ay + t * aby, cz = az + t * abz;
-  const dx = px - cx, dy = py - cy, dz = pz - cz;
+  const dx = p.x - (a.x + t * abx), dy = p.y - (a.y + t * aby), dz = p.z - (a.z + t * abz);
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-// Scratch-step a temporary clock computation (no real SimClock mutation) to find the
-// next simTime when the Shadow Object aligns on the sun-moon segment during a full moon.
-// Returns simTime (number) or null if none found within 400 sim-days.
+function _smoothstep(x) {
+  x = Math.max(0, Math.min(1, x));
+  return x * x * (3 - 2 * x);
+}
+
+// Full-moon angular error (rad) and Shadow-Object distance from the sun-moon
+// segment (units) at simTime t. Shared by the finder and the tint ramp.
+function _eclipseGeometryAt(t) {
+  const phaseDiff = _normalizeAngle(sunAngleAt(t) - moonAngleAt(t));
+  const fmErr = Math.abs(phaseDiff - Math.PI);
+  if (fmErr >= CONSTANTS.FULL_MOON_TOL) return { fmErr, dist: Infinity };
+  const dist = _pointToSegmentDist(shadowObjectPosAt(t), sunPosAt(t), moonPosAt(t));
+  return { fmErr, dist };
+}
+
+// Next simTime at which the Shadow Object sits on the sun-moon segment during a
+// full moon — the eclipse ONSET (peak follows within a few sim-hours). Scans
+// forward in 0.05 h steps; returns null if none within 400 sim-days.
 export function findNextLunarEclipse(fromSimTime) {
   const step = 0.05;
   const cap = fromSimTime + 400 * 24;
-
-  // Inline the same math as SimClock getters, without constructing a real clock.
-  function sunAngleAt(t) { return ((t % 24) / 24) * 2 * Math.PI; }
-  function moonAngleAt(t) { return ((t * CONSTANTS.MOON_RATE_RATIO) / 24) * 2 * Math.PI; }
-  function dayAt(t) { return Math.floor(t / 24) % 365; }
-  function sunPathRadiusAt(t) {
-    const d = dayAt(t);
-    const dec = (CONSTANTS.SUN_DECLINATION_AMP * Math.PI / 180) * Math.cos(2 * Math.PI * (d - 172) / 365);
-    const normDec = dec / (CONSTANTS.SUN_DECLINATION_AMP * Math.PI / 180);
-    return CONSTANTS.SUN_PATH_BASE - normDec * CONSTANTS.SUN_PATH_RANGE;
-  }
-  function moonPathRadiusAt(t) {
-    const d = dayAt(t);
-    return CONSTANTS.SUN_PATH_BASE
-      - CONSTANTS.SUN_PATH_RANGE * Math.cos(2 * Math.PI * (d - 172) / 365 + CONSTANTS.MOON_PATH_PHASE_OFFSET);
-  }
-
   for (let t = fromSimTime + 0.5; t < cap; t += step) {
-    const sa = sunAngleAt(t);
-    const ma = moonAngleAt(t);
-    const phaseDiff = _normalizeAngle(sa - ma);
-    if (Math.abs(phaseDiff - Math.PI) >= CONSTANTS.FULL_MOON_TOL) continue;
-
-    const r = sunPathRadiusAt(t);
-    const sx = r * Math.cos(-sa), sz = r * Math.sin(-sa);
-    const sy = CONSTANTS.SUN_ALTITUDE;
-
-    const mr = moonPathRadiusAt(t);
-    const mx = mr * Math.cos(-ma), mz = mr * Math.sin(-ma);
-    const my = CONSTANTS.MOON_ALTITUDE;
-
-    const a = (t / 24 / CONSTANTS.SHADOW_OBJECT_PERIOD) * 2 * Math.PI;
-    const bob = Math.sin(a * 5) * 0.3;
-    const spx = sx + CONSTANTS.SHADOW_OBJECT_ORBIT_RADIUS * Math.cos(a);
-    const spy = CONSTANTS.SUN_ALTITUDE + bob;
-    const spz = sz + CONSTANTS.SHADOW_OBJECT_ORBIT_RADIUS * Math.sin(a);
-
-    const dist = _pointToSegmentDist(spx, spy, spz, sx, sy, sz, mx, my, mz);
-    if (dist < CONSTANTS.ECLIPSE_ALIGN_TOL) return t;
+    if (_eclipseGeometryAt(t).dist < CONSTANTS.ECLIPSE_ALIGN_TOL) return t;
   }
   return null;
 }
@@ -328,23 +318,9 @@ export function findNextLunarEclipse(fromSimTime) {
 // Product of smoothstep on full-moon angular error and shadow-object segment distance.
 // Drives the blood-moon tint ramp regardless of whether shadowObject is visible.
 export function eclipseAlignmentFactor(clock) {
-  const sa = clock.sunAngle;
-  const ma = clock.moonAngle;
-  const phaseDiff = _normalizeAngle(sa - ma);
-  const fmErr = Math.abs(phaseDiff - Math.PI);
-
-  const sx = clock.sunX, sz = clock.sunZ, sy = CONSTANTS.SUN_ALTITUDE;
-  const mx = clock.moonX, mz = clock.moonZ, my = CONSTANTS.MOON_ALTITUDE;
-  const sp = clock.shadowObjectPosition(sx, sz);
-  const dist = _pointToSegmentDist(sp.x, sp.y, sp.z, sx, sy, sz, mx, my, mz);
-
-  function smoothstep(x) {
-    x = Math.max(0, Math.min(1, x));
-    return x * x * (3 - 2 * x);
-  }
-
-  const fmFactor  = 1 - smoothstep(fmErr / CONSTANTS.FULL_MOON_TOL);
-  const segFactor = 1 - smoothstep(dist  / CONSTANTS.ECLIPSE_ALIGN_TOL);
+  const { fmErr, dist } = _eclipseGeometryAt(clock.simTime);
+  const fmFactor  = 1 - _smoothstep(fmErr / CONSTANTS.FULL_MOON_TOL);
+  const segFactor = 1 - _smoothstep(dist  / CONSTANTS.ECLIPSE_ALIGN_TOL);
   return fmFactor * segFactor;
 }
 

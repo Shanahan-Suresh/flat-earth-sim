@@ -6,6 +6,7 @@ import {
   CONSTANTS, SimClock,
   findNextFullMoon, findNextSolstice, findNextLunarEclipse, eclipseAlignmentFactor,
   activeShower, frostFactor, latLonToDisc,
+  sunPosAt, moonPosAt, shadowObjectPosAt, sunPathRadiusAt, starAngleAt,
 } from '../js/sim.js';
 
 // 360 / (360 - 347.81) days = 29.532 days, the synodic month the constants imply
@@ -109,4 +110,17 @@ test('SimClock.monthName / seasonName boundaries', () => {
   assert.equal(SimClock.seasonName(172), 'Summer');
   assert.equal(SimClock.seasonName(266), 'Autumn');
   assert.equal(SimClock.seasonName(355), 'Winter');
+});
+
+test('pure helpers and SimClock getters agree (finders and scene share one model)', () => {
+  const c = new SimClock();
+  for (const t of [0, 172 * 24 + 12, 1000.37, 355 * 24 + 3, 9000.5]) {
+    c.simTime = t;
+    const s = sunPosAt(t), m = moonPosAt(t), sh = shadowObjectPosAt(t), cs = c.shadowObjectPosition();
+    assert.ok(Math.abs(s.x - c.sunX) < 1e-12 && Math.abs(s.z - c.sunZ) < 1e-12);
+    assert.ok(Math.abs(m.x - c.moonX) < 1e-12 && Math.abs(m.z - c.moonZ) < 1e-12);
+    assert.ok(Math.abs(sh.x - cs.x) < 1e-12 && Math.abs(sh.y - cs.y) < 1e-12 && Math.abs(sh.z - cs.z) < 1e-12);
+    assert.equal(sunPathRadiusAt(t), c.sunPathRadius);
+    assert.equal(starAngleAt(t), c.starAngle);
+  }
 });

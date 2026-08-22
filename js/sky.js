@@ -383,7 +383,7 @@ export function updateSky(sky, clock, toggles) {
 
   // Shadow object — always position it (eclipseAlignmentFactor uses it); only render when toggled
   {
-    const sp = clock.shadowObjectPosition(sx, sz);
+    const sp = clock.shadowObjectPosition();
     shadowObjGroup.position.set(sp.x, sp.y, sp.z);
   }
   shadowObjGroup.visible = toggles.shadowObject;
