@@ -9,7 +9,7 @@ const LORE_TIPS = {
   'chk-sunbeam':   "The sun emits a focused cone of light, not a globe-illuminating beam. Only the disc below its path receives daylight — hence the rotating day/night boundary the flat model predicts.",
   'chk-shadow':    "The Flat Earth Society's answer to lunar eclipses: an invisible 'Shadow Object' orbits between the sun and moon, casting a shadow that explains every eclipse without a spherical Earth. (wiki.tfes.org)",
   'chk-aurora':    "Believers report auroras dancing over the ice wall's rim — light playing on the dome's inner edge, refracted through the ice. Rowbotham noted the aurora was always seen near the horizon, consistent with a rim effect.",
-  'chk-constellations': "The stars are lamps hung on the underside of the dome, turning once per sidereal day. The Hub circles Polaris, \"the one nail that never moves.\"",
+  'chk-constellations': "The stars are lamps hung on the underside of the dome, turning once per sidereal day. The Hub circles Polaris, \"the one nail that never moves.\" (Figure names are flavour, not doctrine.)",
 
   // Edge modes
   'edge-icewall':   "Samuel Rowbotham and modern TFES consensus: a 150-ft Antarctic ice wall rings the disc and holds the oceans in. The UN flag depicts it faithfully. Military treaties forbid civilian access — the official story.",
@@ -25,8 +25,8 @@ const LORE_TIPS = {
   // Overlays
   'chk-routes':     "On the flat map, southern hemisphere flights stretch enormously and route north past the equator. Airlines claim to fly Sydney–Santiago nonstop in ~12.5 h — flat earthers say the real route curves through North America, hidden by closed-cockpit navigation.",
   'chk-observers':  "The sun's spotlight circle determines local time: observers inside the lit patch have day, those outside have night. Local solar time is simply each point's angular position relative to the sun's azimuth.",
-  'chk-traffic':    "Overhead, airliners quietly fly the flat map's true routes — closed cockpits, curtained windows, and a 14-hour crossing over the southern reaches that a globe model would never require.",
-  'chk-lights':     "Cities need no lamps within the sun's spotlight — but the moment its cone slides past, streets and skylines kindle below the dome, exactly where the day patch used to be.",
+  'chk-traffic':    "Overhead, airliners quietly fly the flat map's true routes — closed cockpits, curtained windows, and a 14-hour crossing over the southern reaches that a globe model would never require. (Ship loops and plane hours are flavour, not doctrine.)",
+  'chk-lights':     "Cities need no lamps within the sun's spotlight — but the moment its cone slides past, streets and skylines kindle below the dome, exactly where the day patch used to be. (The city set is flavour.)",
 
   // Weather
   'chk-rain':       "Rowbotham held that all weather — rain included — lives in the lower air, drifting well beneath the solid firmament above.",
@@ -61,7 +61,7 @@ const LORE = {
   traffic:   "Airliners fly the flat map's true routes behind closed cockpits — 14-hour southern crossings the globe model would call impossible.",
   lights:    "When the sun's spotlight slides on, the cities beneath kindle — no lamps needed inside the day patch.",
   rain:      "Rowbotham held all weather lives in the lower air, well beneath the firmament.",
-  constellations: "Lamps hung on the underside of the dome, turning once per sidereal day. The Hub circles Polaris — the one nail that never moves.",
+  constellations: "Lamps hung on the underside of the dome, turning once per sidereal day. The Hub circles Polaris — the one nail that never moves. (Figure names are flavour, not doctrine.)",
 };
 
 let _groundMode = false;
@@ -660,7 +660,8 @@ function refreshAlmanac(sim) {
   const shEl = document.getElementById('alm-shower');
   if (shEl) {
     if (sh) {
-      shEl.textContent = '☄ ' + sh.name.toUpperCase();
+      shEl.textContent = '☄ ' + sh.name.toUpperCase() + ' (flavour)';
+      shEl.title = 'Meteor-shower names and dates are invented colour, not sourced doctrine.';
       shEl.style.display = 'block';
     } else {
       shEl.style.display = 'none';

@@ -191,6 +191,10 @@ Stars are fixed to a rotating wheel (sidereal day 23.93 h). Polaris sits at the 
 
 The eclipse finder scans forward through sim time for the next moment the Shadow Object crosses the sun–moon segment during a full moon — the same alignment math that drives the blood-red tint ramp.
 
+### Doctrine vs flavour
+
+Everything in the table above is sourced: the sun's path and height, the self-luminous moon, the dome, the Shadow Object, the ice wall, the bipolar rival map. The *Cozy Update* (v1.2) added colour that is **invented, not sourced** and is labelled as such in its tooltips: the constellation names and figures, the three meteor-shower names and dates, the ship loops, the city set and the 14-hour plane legs. They decorate the model; they are not claims about it.
+
 ### What the consensus actually says
 
 - **Water does NOT fall off.** The ice wall (lore: ~150 ft of Antarctic ice) contains the oceans. The "edge waterfall" is an outsider meme; the community explicitly disavows it (included here as a toggle, labeled as such).
