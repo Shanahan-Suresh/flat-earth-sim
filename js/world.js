@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CONSTANTS, frostFactor } from './sim.js';
+import { buildRandom } from './rng.js';
 import { makeWorldMapTexture, makeWaterfallTexture, makeBipolarMapTexture, makeFrostTexture } from './textures.js';
 
 export function buildWorld(scene) {
@@ -38,13 +39,13 @@ export function buildWorld(scene) {
   for (let i = 0; i < CONSTANTS.ICE_WALL_COUNT; i++) {
     const angle = (i / CONSTANTS.ICE_WALL_COUNT) * Math.PI * 2;
     const h = CONSTANTS.ICE_WALL_HEIGHT_MIN
-      + Math.random() * (CONSTANTS.ICE_WALL_HEIGHT_MAX - CONSTANTS.ICE_WALL_HEIGHT_MIN);
+      + buildRandom() * (CONSTANTS.ICE_WALL_HEIGHT_MAX - CONSTANTS.ICE_WALL_HEIGHT_MIN);
 
     let geo;
     if (i % 3 === 0) {
       geo = new THREE.ConeGeometry(0.12, h, 4);
     } else {
-      geo = new THREE.BoxGeometry(0.18 + Math.random() * 0.1, h, 0.18 + Math.random() * 0.1);
+      geo = new THREE.BoxGeometry(0.18 + buildRandom() * 0.1, h, 0.18 + buildRandom() * 0.1);
     }
 
     // Self-emissive tint so ice reads white-blue day or night (never muddy tan)
@@ -54,13 +55,13 @@ export function buildWorld(scene) {
       emissiveIntensity: 0.35,
     });
     const block = new THREE.Mesh(geo, mat);
-    const r = 9.9 + (Math.random() - 0.5) * 0.15;
+    const r = 9.9 + (buildRandom() - 0.5) * 0.15;
     block.position.set(
       r * Math.cos(angle),
       h / 2,
       r * Math.sin(angle)
     );
-    block.rotation.y = angle + (Math.random() - 0.5) * 0.3;
+    block.rotation.y = angle + (buildRandom() - 0.5) * 0.3;
     iceWallGroup.add(block);
   }
   scene.add(iceWallGroup);
@@ -121,9 +122,9 @@ export function buildWorld(scene) {
   // Foam particle ring at rim lip
   const foamPositions = [];
   for (let i = 0; i < 200; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const r = 9.85 + Math.random() * 0.2;
-    foamPositions.push(r * Math.cos(a), Math.random() * 0.1, r * Math.sin(a));
+    const a = buildRandom() * Math.PI * 2;
+    const r = 9.85 + buildRandom() * 0.2;
+    foamPositions.push(r * Math.cos(a), buildRandom() * 0.1, r * Math.sin(a));
   }
   const foamGeo = new THREE.BufferGeometry();
   foamGeo.setAttribute('position', new THREE.Float32BufferAttribute(foamPositions, 3));
@@ -158,9 +159,9 @@ export function buildWorld(scene) {
   const islandColors = [0x4a7a40, 0x556644, 0x6a7a50, 0x445533, 0x3a6630, 0x507060];
   for (let i = 0; i < 6; i++) {
     const a = islandAngles[i];
-    const r = 11.5 + Math.random() * 3.5;
+    const r = 11.5 + buildRandom() * 3.5;
 
-    const baseGeo = new THREE.CylinderGeometry(0.6 + Math.random() * 0.4, 0.8, 0.25, 8);
+    const baseGeo = new THREE.CylinderGeometry(0.6 + buildRandom() * 0.4, 0.8, 0.25, 8);
     const baseMat = new THREE.MeshLambertMaterial({ color: islandColors[i], flatShading: true });
     const base = new THREE.Mesh(baseGeo, baseMat);
     base.position.set(r * Math.cos(a), 0.125, r * Math.sin(a));
@@ -182,9 +183,9 @@ export function buildWorld(scene) {
   // Faint wisps ring
   const wispPos = [];
   for (let i = 0; i < 120; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const rr = 11 + Math.random() * 5;
-    wispPos.push(rr * Math.cos(a), 0.5 + Math.random() * 0.5, rr * Math.sin(a));
+    const a = buildRandom() * Math.PI * 2;
+    const rr = 11 + buildRandom() * 5;
+    wispPos.push(rr * Math.cos(a), 0.5 + buildRandom() * 0.5, rr * Math.sin(a));
   }
   const wispGeo = new THREE.BufferGeometry();
   wispGeo.setAttribute('position', new THREE.Float32BufferAttribute(wispPos, 3));
@@ -203,17 +204,17 @@ export function buildWorld(scene) {
   const cloudGroup = new THREE.Group();
 
   for (let c = 0; c < 12; c++) {
-    const angle = (c / 12) * Math.PI * 2 + Math.random();
-    const r = 2 + Math.random() * 6;
+    const angle = (c / 12) * Math.PI * 2 + buildRandom();
+    const r = 2 + buildRandom() * 6;
     const cloudBase = new THREE.Group();
-    cloudBase.position.set(r * Math.cos(angle), 1.2 + Math.random() * 0.4, r * Math.sin(angle));
+    cloudBase.position.set(r * Math.cos(angle), 1.2 + buildRandom() * 0.4, r * Math.sin(angle));
     cloudBase.userData.orbitRadius = r;
     cloudBase.userData.orbitAngle = angle;
-    cloudBase.userData.orbitSpeed = 0.02 + Math.random() * 0.03;
+    cloudBase.userData.orbitSpeed = 0.02 + buildRandom() * 0.03;
 
-    const blobCount = 3 + Math.floor(Math.random() * 3);
+    const blobCount = 3 + Math.floor(buildRandom() * 3);
     for (let b = 0; b < blobCount; b++) {
-      const blobGeo = new THREE.SphereGeometry(0.25 + Math.random() * 0.15, 6, 4);
+      const blobGeo = new THREE.SphereGeometry(0.25 + buildRandom() * 0.15, 6, 4);
       // Emissive lift so clouds read soft-white day or night, not muddy olive
       const blobMat = new THREE.MeshToonMaterial({
         color: 0xf4f8ff,
@@ -223,9 +224,9 @@ export function buildWorld(scene) {
       const blob = new THREE.Mesh(blobGeo, blobMat);
       blob.scale.y = 0.4;
       blob.position.set(
-        (Math.random() - 0.5) * 0.5,
-        (Math.random() - 0.5) * 0.1,
-        (Math.random() - 0.5) * 0.5
+        (buildRandom() - 0.5) * 0.5,
+        (buildRandom() - 0.5) * 0.1,
+        (buildRandom() - 0.5) * 0.5
       );
       cloudBase.add(blob);
     }
@@ -288,17 +289,17 @@ export function buildRain(scene) {
 
   for (let c = 0; c < CONSTANTS.RAIN.CELLS; c++) {
     const cellGroup = new THREE.Group();
-    const startAngle = Math.random() * Math.PI * 2;
-    const startR = 2 + Math.random() * 5;
+    const startAngle = buildRandom() * Math.PI * 2;
+    const startR = 2 + buildRandom() * 5;
     const x0 = startR * Math.cos(startAngle);
     const z0 = startR * Math.sin(startAngle);
     cellGroup.position.set(x0, CONSTANTS.RAIN.ALT, z0);
-    cellGroup.userData = { heading: Math.random() * Math.PI * 2, x: x0, z: z0 };
+    cellGroup.userData = { heading: buildRandom() * Math.PI * 2, x: x0, z: z0 };
 
     // Flattened dark cloud blobs (mirrors the cloudGroup construction above)
-    const blobCount = 4 + Math.floor(Math.random() * 2); // 4-5
+    const blobCount = 4 + Math.floor(buildRandom() * 2); // 4-5
     for (let b = 0; b < blobCount; b++) {
-      const blobGeo = new THREE.SphereGeometry(0.28 + Math.random() * 0.15, 6, 4);
+      const blobGeo = new THREE.SphereGeometry(0.28 + buildRandom() * 0.15, 6, 4);
       const blobMat = new THREE.MeshToonMaterial({
         color: 0x8a90a8,
         emissive: 0x5a6078,
@@ -307,9 +308,9 @@ export function buildRain(scene) {
       const blob = new THREE.Mesh(blobGeo, blobMat);
       blob.scale.y = 0.35;
       blob.position.set(
-        (Math.random() - 0.5) * 0.6,
-        (Math.random() - 0.5) * 0.12,
-        (Math.random() - 0.5) * 0.6
+        (buildRandom() - 0.5) * 0.6,
+        (buildRandom() - 0.5) * 0.12,
+        (buildRandom() - 0.5) * 0.6
       );
       cellGroup.add(blob);
     }
@@ -318,11 +319,11 @@ export function buildRain(scene) {
     const streakCount = CONSTANTS.RAIN.STREAKS;
     const positions = new Float32Array(streakCount * 2 * 3);
     for (let i = 0; i < streakCount; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const r = Math.random() * 0.7;
+      const a = buildRandom() * Math.PI * 2;
+      const r = buildRandom() * 0.7;
       const sx = r * Math.cos(a);
       const sz = r * Math.sin(a);
-      const sy = 0.2 + Math.random() * 1.2; // ~0.2..1.4
+      const sy = 0.2 + buildRandom() * 1.2; // ~0.2..1.4
 
       positions[i * 6 + 0] = sx;
       positions[i * 6 + 1] = sy;

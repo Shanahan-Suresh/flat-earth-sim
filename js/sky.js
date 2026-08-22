@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CONSTANTS, eclipseAlignmentFactor, activeShower } from './sim.js';
 import { makeMoonPhaseTextures, makeTwilightTexture, makeAuroraTexture, makeSparkleTexture } from './textures.js';
+import { buildRandom } from './rng.js';
 
 // Point on the star shell given azimuth (deg) and polar angle from the dome
 // apex (deg, 0 = apex where Polaris sits). Mirrors makeStarLayer's hemisphere
@@ -26,8 +27,8 @@ export function buildSky(scene) {
   function makeStarLayer(count, color, size, opacity) {
     const positions = [];
     for (let i = 0; i < count; i++) {
-      const phi = Math.acos(Math.random()); // hemisphere
-      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(buildRandom()); // hemisphere
+      const theta = buildRandom() * Math.PI * 2;
       const r = CONSTANTS.STAR_RADIUS;
       positions.push(
         r * Math.sin(phi) * Math.cos(theta),

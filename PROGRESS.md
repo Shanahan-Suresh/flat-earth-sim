@@ -17,8 +17,8 @@ One Conventional Commit per step, on `main`. Push only at the end (deploys GitHu
 - [x] 3. `refactor(state)`: `js/state.js` schema; `test/state.test.js`; main.js lists removed
 - [x] 4. `refactor(ui)`: initUI context/handles; single `setEdgeMode`; slider labels; pause text; sky.js needsUpdate lines
 - [x] 5. `fix(map)`: 180° onto full disc; Antarctica band 227–256 px; tropic circles; bipolar ring; docs numbers
-- [ ] 6. `docs(lore)`: doctrine vs flavour (README, About, tooltips)
-- [ ] 7. `feat(scene)`: `js/rng.js` seeded build RNG
+- [x] 6. `docs(lore)`: doctrine vs flavour (README, About, tooltips)
+- [x] 7. `feat(scene)`: `js/rng.js` seeded build RNG
 - [ ] 8. `feat(ui)`: COPY LINK; one-shot URL params; postcards stop writing address bar
 - [ ] 9. `feat(ui)`: mobile media queries; panel collapsed on small screens
 - [ ] 10. `chore`: LICENSE (MIT), `assets/PressStart2P-OFL.txt`, favicon, OG meta

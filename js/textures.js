@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CONSTANTS, latLonToDisc } from './sim.js';
+import { buildRandom, makeRng } from './rng.js';
 
 export function applyNearestFilter(texture) {
   texture.magFilter = THREE.NearestFilter;
@@ -73,11 +74,11 @@ export function makeWorldMapTexture() {
   // Land texture speckles — slightly lighter/darker dots over land areas
   const speckleColors = ['#7cc468', '#58a04c', '#86ce72'];
   for (let i = 0; i < 300; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * 198; // keep speckles inside the land zone (north of ~50°S)
+    const angle = buildRandom() * Math.PI * 2;
+    const dist = buildRandom() * 198; // keep speckles inside the land zone (north of ~50°S)
     const sx = 256 + dist * Math.cos(angle);
     const sy = 256 + dist * Math.sin(angle);
-    const sc = speckleColors[Math.floor(Math.random() * speckleColors.length)];
+    const sc = speckleColors[Math.floor(buildRandom() * speckleColors.length)];
     // Only draw speckles — they'll be invisible over ocean but add texture over land
     ctx.beginPath();
     ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
@@ -276,8 +277,8 @@ export function makeSparkleTexture() {
   // Transparent background
   ctx.clearRect(0, 0, 64, 64);
 
-  // ~40 random 1–2px white/pale-cyan dots
-  const rng = (() => { let s = 42; return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; }; })();
+  // ~40 seeded 1–2px white/pale-cyan dots (own seed: tiling must not depend on build order)
+  const rng = makeRng(42);
   for (let i = 0; i < 40; i++) {
     const x = Math.floor(rng() * 63);
     const y = Math.floor(rng() * 63);
@@ -400,13 +401,14 @@ export function makeFrostTexture() {
     ctx.arc(cx, cy, 128, 0, Math.PI * 2);
     ctx.fill();
 
-    // Sparse 1-2px frost speckle grain in the frosted band
+    // Sparse 1-2px frost speckle grain in the frosted band (same grain every redraw)
+    const rng = makeRng(7);
     for (let i = 0; i < 60; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const rr = innerR + Math.random() * (128 - innerR);
+      const a = rng() * Math.PI * 2;
+      const rr = innerR + rng() * (128 - innerR);
       const sx = cx + rr * Math.cos(a);
       const sy = cy + rr * Math.sin(a);
-      const size = Math.random() < 0.5 ? 1 : 2;
+      const size = rng() < 0.5 ? 1 : 2;
       ctx.fillStyle = 'rgba(240,250,255,0.85)';
       ctx.fillRect(sx, sy, size, size);
     }
