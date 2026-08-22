@@ -10,6 +10,7 @@ import { buildSky, updateSky, updateMeteors } from './sky.js';
 import { initUI, updateUI, isGroundMode } from './ui.js';
 import { buildOverlays, maybeUpdateObserverBox, buildCityLights, maybeUpdateCityLights, buildTraffic, updateTraffic } from './overlays.js';
 import { initAudio, setAudioEnabled, setEdgeMode as audioSetEdgeMode, setDayFactor, setRainIntensity, setEdgeProximity } from './audio.js';
+import { applyState as applySchemaState, captureState as captureSchemaState, serializeState, parseUrlState } from './state.js';
 
 // Error log hook (dev)
 window.addEventListener('error', e => {
@@ -135,157 +136,10 @@ export function setViewMode(mode, overrideCamPos) {
 // ── Simulation Clock ──────────────────────────────────────────────────────────
 const sim = new SimClock();
 
-// ── applyState / captureState ─────────────────────────────────────────────────
-// applyState(params): drive UI inputs from a plain object; all keys optional.
-// params shape: {edge, dome, clouds, beam, shadow, day, time, speed, px, cam,
-//               view, model, aurora, routes, observers, audio,
-//               traffic, lights, rain, constellations}
-function applyState(params) {
-  const setInput = (id, val, evt) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (el.type === 'checkbox') el.checked = val;
-    else el.value = val;
-    el.dispatchEvent(new Event(evt || 'change'));
-  };
-
-  if (params.edge !== undefined) {
-    const el = document.getElementById('edge-' + params.edge);
-    if (el) { el.checked = true; el.dispatchEvent(new Event('change')); }
-  }
-
-  const boolMap = [
-    ['dome',      'chk-dome'],
-    ['clouds',    'chk-clouds'],
-    ['beam',      'chk-sunbeam'],
-    ['shadow',    'chk-shadow'],
-    ['aurora',    'chk-aurora'],
-    ['routes',    'chk-routes'],
-    ['observers', 'chk-observers'],
-    ['audio',     'chk-audio'],
-    ['traffic',        'chk-traffic'],
-    ['lights',         'chk-lights'],
-    ['rain',           'chk-rain'],
-    ['constellations', 'chk-constellations'],
-  ];
-  for (const [key, id] of boolMap) {
-    if (params[key] !== undefined) setInput(id, !!params[key]);
-  }
-
-  if (params.view !== undefined) {
-    const vEl = document.getElementById(
-      params.view === 'ground' ? 'view-ground' : 'view-diorama'
-    );
-    if (vEl) { vEl.checked = true; vEl.dispatchEvent(new Event('change')); }
-  }
-  if (params.model !== undefined) {
-    const mEl = document.getElementById(
-      params.model === 'bipolar' ? 'model-bipolar' : 'model-monopole'
-    );
-    if (mEl) { mEl.checked = true; mEl.dispatchEvent(new Event('change')); }
-  }
-
-  if (params.day !== undefined || params.time !== undefined) {
-    const d = params.day  !== undefined ? Math.max(0, Math.min(364, parseInt(params.day)  || 0)) : sim.day;
-    const t = params.time !== undefined ? Math.max(0, Math.min(24,  parseFloat(params.time) || 0)) : sim.timeOfDay;
-    sim.simTime = d * 24 + t;
-  }
-
-  if (params.speed !== undefined) setInput('slider-speed', params.speed, 'input');
-  if (params.px    !== undefined) setInput('slider-pixel',  params.px,    'input');
-
-  if (params.cam !== undefined) {
-    const [x, y, z] = Array.isArray(params.cam)
-      ? params.cam
-      : String(params.cam).split(',').map(Number);
-    if ([x, y, z].every(Number.isFinite)) {
-      camera.position.set(x, y, z);
-      controls.update();
-    }
-  }
-}
-
-// captureState(): snapshot current full state as a plain object.
-function captureState() {
-  const edgeNames = ['icewall', 'waterfall', 'infinite', 'beyond'];
-  let edge = 'icewall';
-  for (const e of edgeNames) {
-    const el = document.getElementById('edge-' + e);
-    if (el && el.checked) { edge = e; break; }
-  }
-
-  const readChk = id => {
-    const el = document.getElementById(id);
-    return el ? el.checked : undefined;
-  };
-  const readRadio = ids => {
-    for (const [id, val] of ids) {
-      const el = document.getElementById(id);
-      if (el && el.checked) return val;
-    }
-    return undefined;
-  };
-
-  const state = {
-    edge,
-    dome:    readChk('chk-dome'),
-    clouds:  readChk('chk-clouds'),
-    beam:    readChk('chk-sunbeam'),
-    shadow:  readChk('chk-shadow'),
-    day:     sim.day,
-    time:    Math.round(sim.timeOfDay * 100) / 100,
-    speed:   (() => { const el = document.getElementById('slider-speed'); return el ? parseFloat(el.value) : undefined; })(),
-    px:      (() => { const el = document.getElementById('slider-pixel'); return el ? parseInt(el.value) : undefined; })(),
-    cam:     [
-      Math.round(camera.position.x * 100) / 100,
-      Math.round(camera.position.y * 100) / 100,
-      Math.round(camera.position.z * 100) / 100,
-    ],
-  };
-
-  // Radio groups and toggle checkboxes — only included if elements exist
-  const view = readRadio([['view-diorama','diorama'],['view-ground','ground']]);
-  if (view !== undefined) state.view = view;
-
-  const model = readRadio([['model-monopole','monopole'],['model-bipolar','bipolar']]);
-  if (model !== undefined) state.model = model;
-
-  for (const [key, id] of [
-    ['aurora','chk-aurora'],['routes','chk-routes'],['observers','chk-observers'],['audio','chk-audio'],
-    ['traffic','chk-traffic'],['lights','chk-lights'],['rain','chk-rain'],['constellations','chk-constellations'],
-  ]) {
-    const v = readChk(id);
-    if (v !== undefined) state[key] = v;
-  }
-
-  return state;
-}
-
-// Serialize a state object to URLSearchParams query string
-function serializeState(state) {
-  const p = new URLSearchParams();
-  if (state.edge    !== undefined) p.set('edge',   state.edge);
-  if (state.dome    !== undefined) p.set('dome',   state.dome   ? '1' : '0');
-  if (state.clouds  !== undefined) p.set('clouds', state.clouds ? '1' : '0');
-  if (state.beam    !== undefined) p.set('beam',   state.beam   ? '1' : '0');
-  if (state.shadow  !== undefined) p.set('shadow', state.shadow ? '1' : '0');
-  if (state.day     !== undefined) p.set('day',    state.day);
-  if (state.time    !== undefined) p.set('time',   state.time);
-  if (state.speed   !== undefined) p.set('speed',  state.speed);
-  if (state.px      !== undefined) p.set('px',     state.px);
-  if (state.cam     !== undefined) p.set('cam',    Array.isArray(state.cam) ? state.cam.join(',') : state.cam);
-  if (state.view      !== undefined) p.set('view',      state.view);
-  if (state.model     !== undefined) p.set('model',     state.model);
-  if (state.routes    !== undefined) p.set('routes',    state.routes    ? '1' : '0');
-  if (state.observers !== undefined) p.set('observers', state.observers ? '1' : '0');
-  if (state.aurora    !== undefined) p.set('aurora',    state.aurora    ? '1' : '0');
-  if (state.audio     !== undefined) p.set('audio',     state.audio     ? '1' : '0');
-  if (state.traffic        !== undefined) p.set('traffic',        state.traffic        ? '1' : '0');
-  if (state.lights         !== undefined) p.set('lights',         state.lights         ? '1' : '0');
-  if (state.rain           !== undefined) p.set('rain',           state.rain           ? '1' : '0');
-  if (state.constellations !== undefined) p.set('constellations', state.constellations ? '1' : '0');
-  return p.toString();
-}
+// ── State plumbing (schema lives in js/state.js) ──────────────────────────────
+const stateCtx = { sim, camera, controls };
+const applyState   = params => applySchemaState(params, stateCtx);
+const captureState = ()     => captureSchemaState(stateCtx);
 
 // ── UI ────────────────────────────────────────────────────────────────────────
 const toggles = initUI(sim, world, sky, composer, pixelPass, camera, controls, applyState, serializeState, setViewMode, requestPhotoSave);
@@ -327,38 +181,13 @@ controls.addEventListener('end', scheduleSave);
   const stored = loadStoredState();
   if (stored) applyState(stored);
 
-  // URL params always win
-  const qp = new URLSearchParams(location.search);
-  const urlState = {};
-  if (qp.get('edge')   !== null) urlState.edge   = qp.get('edge');
-  if (qp.get('dome')   !== null) urlState.dome   = qp.get('dome')   !== '0';
-  if (qp.get('clouds') !== null) urlState.clouds = qp.get('clouds') !== '0';
-  if (qp.get('beam')   !== null) urlState.beam   = qp.get('beam')   !== '0';
-  if (qp.get('shadow') !== null) urlState.shadow = qp.get('shadow') !== '0';
-  if (qp.get('day')    !== null) urlState.day    = qp.get('day');
-  if (qp.get('time')   !== null) urlState.time   = qp.get('time');
-  if (qp.get('speed')  !== null) urlState.speed  = qp.get('speed');
-  if (qp.get('px')     !== null) urlState.px     = qp.get('px');
-  if (qp.get('cam')    !== null) urlState.cam    = qp.get('cam');
-  if (qp.get('aurora')    !== null) urlState.aurora    = qp.get('aurora')    !== '0';
-  if (qp.get('view')      !== null) urlState.view      = qp.get('view');
-  if (qp.get('routes')    !== null) urlState.routes    = qp.get('routes')    !== '0';
-  if (qp.get('observers') !== null) urlState.observers = qp.get('observers') !== '0';
-  if (qp.get('model')     !== null) urlState.model     = qp.get('model');
-  if (qp.get('audio')     !== null) urlState.audio     = qp.get('audio')     !== '0';
-  if (qp.get('traffic')        !== null) urlState.traffic        = qp.get('traffic')        !== '0';
-  if (qp.get('lights')         !== null) urlState.lights         = qp.get('lights')         !== '0';
-  if (qp.get('rain')           !== null) urlState.rain           = qp.get('rain')           !== '0';
-  if (qp.get('constellations') !== null) urlState.constellations = qp.get('constellations') !== '0';
-  if (Object.keys(urlState).length) {
-    // If switching to ground view with an explicit cam param, override ground default pos
-    if (urlState.view === 'ground' && urlState.cam) {
-      applyState({ ...urlState, _groundCamOverride: true });
-    } else {
-      applyState(urlState);
-    }
-  }
+  // URL params always win (cam is applied last by the schema, so an explicit
+  // cam overrides the ground-view default standing spot)
+  const urlState = parseUrlState(location.search);
+  if (Object.keys(urlState).length) applyState(urlState);
+
   // eclipse=1: action param — find+jump to next eclipse after other state is applied
+  const qp = new URLSearchParams(location.search);
   if (qp.get('eclipse') === '1' && typeof initUI._jumpToEclipse === 'function') {
     initUI._jumpToEclipse();
   }
