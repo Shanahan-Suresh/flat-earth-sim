@@ -26,7 +26,15 @@ A real-time 3D diorama of the flat-earth consensus model as described by [TFES (
 
 ## What's new in v1.3 — the Honest Update
 
+A maintenance release: one lore bug, one UX bug, and the repo put in order.
+
 - **Map scale fixed.** v1.1's "true AE" map squeezed 180° of latitude into 86% of the disc, so the lore sun (4,600 mi path in June) sat over 12°N instead of the Tropic of Cancer, and 42°S in December instead of Capricorn. The south pole now sits at the disc edge — Antarctica *is* the rim, which is the lore — and the continents, routes, observers and city lights all moved outward ~16% to match. Faint dashed tropic circles mark the sun's turning paths; a unit test pins Cancer/Capricorn under the solstice sun paths. Sydney–Santiago's flat distance is now 15,974 mi.
+- **🔗 COPY LINK** (LOOK section) builds a URL that reproduces the exact view. URL parameters are now one-shot: applied on load, then stripped, so a postcard you clicked last week can no longer override today's settings on reload (v1.1–1.2 did exactly that).
+- **Same diorama every load** — build-time randomness (ice-wall blocks, clouds, islands, star field, map speckle) is seeded, so a shared link shows the frame you saw.
+- **Phone layout** — bigger type and tap targets under 640 px; the panel starts collapsed, `[+]` opens it.
+- **Doctrine vs flavour** — invented v1.2 colour (constellation and shower names, ship loops, city set) is labelled as such in the README, the About modal and its tooltips.
+- **Tests + CI** — `node --test` pins the almanac math, the eclipse finder, the projection scale and the URL state round-trip; GitHub Actions runs it on push. No npm, no dependencies.
+- **Housekeeping** — MIT licence, the font's OFL text, a favicon (no more 404 in the smoke-test log), description/OG meta for link previews, and `js/state.js` so adding a toggle is one schema entry instead of edits in four lists.
 
 ## What's new in v1.2 — the Cozy Update
 
@@ -214,10 +222,12 @@ Everything in the table above is sourced: the sun's path and height, the self-lu
 
 ```
 js/main.js        — renderer setup, EffectComposer, OrbitControls, animation loop,
-                    state capture/apply/serialize, localStorage persistence, view modes
-js/sim.js         — wall clock, orbital math, CONSTANTS (all lore values live here),
-                    eclipse/full-moon/solstice finders, meteor-shower + frost math,
-                    lat/lon → disc projection
+                    localStorage persistence, one-shot URL params, view + edge modes
+js/state.js       — STATE_SCHEMA: the one table behind apply / capture / serialize / parse
+js/sim.js         — wall clock, pure sun/moon/shadow position helpers, CONSTANTS (all lore
+                    values live here), eclipse/full-moon/solstice finders, meteor-shower +
+                    frost math, lat/lon → disc projection
+js/rng.js         — seeded build-time RNG (mulberry32) so every load renders the same scene
 js/world.js       — disc geometry, ice wall, and all four edge variants; bipolar map swap;
                     frost ring, drifting rain cells
 js/sky.js         — sun, moon, stars, dome, planets, Shadow Object, aurora, twilight ring,
@@ -227,8 +237,10 @@ js/overlays.js    — flight routes + observer pins on the AE map; distance & so
 js/audio.js       — procedural WebAudio: wind, firmament pad, waterfall crossfade,
                     rain, crickets, dawn/dusk birds, ice-wall foghorn
 js/textures.js    — all textures procedural via Canvas 2D (no binary image assets)
-js/ui.js          — right-panel HTML controls, almanac panel, postcards, lore tooltips, photo mode
+js/ui.js          — right-panel HTML controls, almanac panel, postcards, lore tooltips,
+                    photo mode, COPY LINK
 
+test/             — node --test suites for sim.js and state.js (no dependencies)
 vendor/           — pinned Three.js 0.180.0 (intentionally committed, no CDN)
   three.module.js — re-exports from three.core.js (both files required)
   three.core.js   — the actual build; missing = silent black canvas
@@ -241,6 +253,14 @@ vendor/           — pinned Three.js 0.180.0 (intentionally committed, no CDN)
 
 ## Dev Notes
 
+### Unit tests
+
+```
+node --test
+```
+
+Node's built-in runner (≥ 20); no npm. `test/sim.test.js` pins the synodic month, solstice wrap, the eclipse finder against the tint function, the projection scale (Cancer under the June sun path) and the lockstep between `SimClock` getters and the pure `*At(t)` helpers; `test/state.test.js` round-trips the URL state. CI runs the same command on push.
+
 ### Smoke test
 
 `smoke-test.html` renders one composer frame, reads back the framebuffer with `gl.readPixels`, counts lit pixels / distinct colors / scene object count, and beacons the result via `GET /SMOKE_RESULT?msg=...` (visible in the HTTP server log).
@@ -251,14 +271,17 @@ Run as:
 python -u -m http.server 8000
 ```
 
-Watch stderr/log for the `/SMOKE_RESULT` beacon **and** for 404s. Do not use `--dump-dom` (races module execution) or rely on the static clock text in `index.html` (placeholder HTML).
+Watch stderr/log for the `/SMOKE_RESULT` beacon **and** for 404s. The build RNG is seeded, so the beacon is stable: `lit=190336/480000 distinctColors=50 objectsInScene=34`. Do not use `--dump-dom` (races module execution) or rely on the static clock text in `index.html` (placeholder HTML).
 
 Headless screenshots on Windows:
 
 ```
 msedge --headless=new --enable-unsafe-swiftshader --use-angle=swiftshader \
-  --virtual-time-budget=15000 --screenshot=out.png http://localhost:8000/
+  --virtual-time-budget=2500 --timeout=90000 --window-size=1400,900 \
+  --screenshot=out.png "http://localhost:8000/?day=172&time=12&speed=0&panel=open"
 ```
+
+Keep the virtual-time budget small: the scene renders at a few fps under SwiftShader, so 15 s of virtual time takes minutes of wall-clock. Any URL parameter works, so every README screenshot is reproducible from its query string.
 
 ### three.core.js gotcha
 
