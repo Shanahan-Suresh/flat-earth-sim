@@ -459,3 +459,40 @@ body {
 
 #routes-box .rb-flat { color: #ffdd44; }
 #routes-box .rb-real { color: #66e0e0; }
+
+/* ── Small screens / touch ──────────────────────────────────────────────────
+   Same layout, bigger type and tap targets; the right panel starts collapsed
+   (ui.js) and becomes nearly full-width when opened. */
+@media (max-width: 640px), (pointer: coarse) {
+  #title-block { top: 8px; left: 8px; padding: 8px 10px; max-width: 210px; }
+  #title { font-size: 10px; }
+  #subtitle { display: none; }
+  #clock-display, #sun-speed { font-size: 8px; }
+
+  #btn-collapse { top: 8px; right: 8px; font-size: 10px; padding: 8px 12px; }
+  #right-panel {
+    top: 48px; right: 8px;
+    width: min(280px, calc(100vw - 16px));
+    max-height: calc(100vh - 64px);
+    padding: 10px 12px;
+  }
+  .section-title { font-size: 8px; }
+  .checkbox-row, .radio-row { font-size: 9px; line-height: 2.4; padding: 4px 0; gap: 10px; }
+  .checkbox-row input, .radio-row input { width: 18px; height: 18px; }
+  .slider-row, .label-small, .almanac-row, .alm-shower { font-size: 8px; }
+  .slider-row input[type="range"] { height: 8px; }
+  .alm-label { width: 60px; }
+  .alm-btn { padding: 6px 8px; font-size: 9px; }
+  .pixel-btn { font-size: 9px; padding: 8px 10px; }
+  .preset-btn { font-size: 8px; padding: 6px 8px; }
+
+  #lore-caption { bottom: 8px; width: calc(100vw - 16px); font-size: 8px; padding: 8px 10px; line-height: 1.9; }
+  #observer-box, #routes-box { left: 8px; font-size: 7px; padding: 6px 8px; max-width: calc(100vw - 16px); overflow-x: auto; }
+  #observer-box { bottom: 96px; }
+  #routes-box { bottom: 170px; }
+  #photo-exit { font-size: 8px; }
+
+  #modal-box { padding: 14px; font-size: 8px; }
+  #modal-box p, .lore-table td, .reset-all-link { font-size: 8px; }
+  .modal-title { font-size: 11px; }
+}
