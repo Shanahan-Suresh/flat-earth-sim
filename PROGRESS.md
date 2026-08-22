@@ -20,9 +20,9 @@ One Conventional Commit per step, on `main`. Push only at the end (deploys GitHu
 - [x] 6. `docs(lore)`: doctrine vs flavour (README, About, tooltips)
 - [x] 7. `feat(scene)`: `js/rng.js` seeded build RNG
 - [x] 8. `feat(ui)`: COPY LINK; one-shot URL params; postcards stop writing address bar
-- [ ] 9. `feat(ui)`: mobile media queries; panel collapsed on small screens
-- [ ] 10. `chore`: LICENSE (MIT), `assets/PressStart2P-OFL.txt`, favicon, OG meta
-- [ ] 11. `ci`: `.github/workflows/test.yml`
+- [x] 9. `feat(ui)`: mobile media queries; panel collapsed on small screens
+- [x] 10. `chore`: LICENSE (MIT), `assets/PressStart2P-OFL.txt`, favicon, OG meta
+- [x] 11. `ci`: `.github/workflows/test.yml`
 - [ ] 12. `docs`: README v1.3 + CLAUDE.md + 7 regenerated screenshots; delete `.superpowers/sdd/progress.md`; push; delete this file
 
 ## Decisions made
