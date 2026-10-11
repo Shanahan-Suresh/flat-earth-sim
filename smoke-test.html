@@ -16,9 +16,8 @@ window.addEventListener('unhandledrejection', function (e) {
 </script>
 <script type="module">
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPixelatedPass } from 'three/addons/postprocessing/RenderPixelatedPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { setupLook } from './js/look.js';
+import { updateSurface } from './js/surface.js';
 import { SimClock, findNextFullMoon, findNextSolstice } from './js/sim.js';
 import { buildWorld, buildRain } from './js/world.js';
 import { buildSky, updateSky } from './js/sky.js';
@@ -36,9 +35,12 @@ try {
   renderer.setSize(800, 600);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 800/600, 0.1, 200);
-  camera.position.set(14, 9, 14);
+  camera.position.set(11.5, 7.4, 11.5);
   camera.lookAt(0, 0, 0);
-  scene.add(new THREE.AmbientLight(0xffd9aa, 0.35));
+  scene.add(new THREE.AmbientLight(0xb4bfe6, 0.85));
+  scene.add(new THREE.HemisphereLight(0xb0c0ff, 0x6a5a48, 0.75));
+  const look = setupLook(renderer, scene, camera);
+  look.setSize(800, 600);
   const world = buildWorld(scene);
   const sky = buildSky(scene);
   const rain = buildRain(scene);
@@ -48,19 +50,17 @@ try {
   const sim = new SimClock();
   const toggles = { dome: true, clouds: true, sunBeam: true, shadowObject: false, traffic: true, lights: true, rain: true, constellations: true };
   updateSky(sky, sim, toggles);
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPixelatedPass(4, scene, camera));
-  composer.addPass(new OutputPass());
-  composer.render();
+  updateSurface(sim, 0);
+  look.composer.render();
   const gl = renderer.getContext();
   const px = new Uint8Array(800 * 600 * 4);
   gl.readPixels(0, 0, 800, 600, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  // The sky backdrop fills every pixel, so "lit" counts the scene's brighter
+  // pixels (land, water, ice) against the dark sky; colours are 3-bit-per-channel bins.
   let lit = 0, colorSet = new Set();
   for (let i = 0; i < px.length; i += 4) {
-    if (px[i] + px[i+1] + px[i+2] > 30) {
-      lit++;
-      if (colorSet.size < 50) colorSet.add((px[i]>>5)+','+(px[i+1]>>5)+','+(px[i+2]>>5));
-    }
+    if (px[i] + px[i+1] + px[i+2] > 240) lit++;
+    colorSet.add((px[i]>>5)+','+(px[i+1]>>5)+','+(px[i+2]>>5));
   }
   const fullMoon = findNextFullMoon(0);
   const solstice = findNextSolstice(0);

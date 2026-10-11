@@ -3,6 +3,20 @@
   src: url('../assets/PressStart2P.ttf') format('truetype');
 }
 
+:root {
+  --panel: rgba(12, 12, 34, 0.86);
+  --panel-solid: #0c0c22;
+  --edge: #4466aa;
+  --edge-soft: #2c3c66;
+  --ink: #c9d4ee;
+  --ink-dim: #6c7aa6;
+  --gold: #ffdd66;
+  --gold-deep: #221100;
+  --hover: #1c2650;
+  --tool: 40px;
+  --icon: 24px;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -14,18 +28,9 @@ body {
   min-height: 100vh;
   overflow: hidden;
   font-family: 'Press Start 2P', monospace;
-  color: #e8dfc0;
+  color: var(--ink);
   image-rendering: pixelated;
-}
-
-/* ── Sky tint — warm dawn gradient shown when camera faces toward sun ── */
-#sky-tint {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background: linear-gradient(180deg, #2a3a6a 0%, #7a5a4a 50%, #c8845a 100%);
-  opacity: 0;
-  pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #canvas {
@@ -36,463 +41,308 @@ body {
   z-index: 1;
 }
 
-/* ── Title block ── */
-#title-block {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 10;
-  background: rgba(10, 10, 30, 0.85);
-  border: 2px solid #4466aa;
-  padding: 10px 14px;
-  max-width: 280px;
-}
-
-#title {
-  font-size: 11px;
-  color: #ffdd66;
-  letter-spacing: 1px;
-  line-height: 1.6;
-  text-shadow: 2px 2px 0 #221100;
-}
-
-#subtitle {
-  font-size: 7px;
-  color: #88aacc;
-  margin-top: 4px;
-  line-height: 1.8;
-}
-
-#clock-display {
-  font-size: 7px;
-  color: #aaddbb;
-  margin-top: 6px;
-  line-height: 1.8;
-}
-
-#sun-speed {
-  font-size: 7px;
-  color: #ffcc66;
-  margin-top: 2px;
-  line-height: 1.8;
-}
-
-/* ── Right panel ── */
-#btn-collapse {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 20;
-}
-
-#right-panel {
-  position: fixed;
-  top: 48px;
-  right: 16px;
-  z-index: 10;
-  background: rgba(10, 10, 30, 0.85);
-  border: 2px solid #4466aa;
-  padding: 10px;
-  width: 220px;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-  transition: transform 0.2s, opacity 0.2s;
-}
-
-#right-panel.collapsed {
-  transform: translateX(240px);
+/* Visually hidden, still in the DOM for the state schema and keyboard focus */
+.vh {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
   opacity: 0;
-  pointer-events: none;
 }
 
-.panel-section {
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #334466;
+/* ── Pixel frame: notched corners, 2px edge ── */
+.frame {
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px),
+                     calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35);
 }
 
-.panel-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
+[data-icon] {
+  display: inline-block;
+  width: var(--icon);
+  height: var(--icon);
+  line-height: 0;
 }
+[data-icon] svg { width: 100%; height: 100%; display: block; }
 
-.section-title {
-  font-size: 7px;
-  color: #88aadd;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
-  line-height: 1.8;
-}
-
-.checkbox-row,
-.radio-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 7px;
-  line-height: 2.2;
-  padding: 2px 0;
-  color: #ccddbb;
-}
-
-.checkbox-row:hover,
-.radio-row:hover {
-  color: #ffffff;
-}
-
-.checkbox-row input,
-.radio-row input {
-  accent-color: #66aaff;
-  width: 12px;
-  height: 12px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.slider-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 6px;
-  line-height: 2.2;
-  color: #aabbcc;
-  margin: 4px 0;
-}
-
-.slider-row input[type="range"] {
-  flex: 1;
-  height: 4px;
-  accent-color: #66aaff;
-  cursor: pointer;
-  image-rendering: pixelated;
-}
-
-.label-small {
-  font-size: 6px;
-  color: #88aacc;
-  line-height: 2.0;
-  margin-top: 2px;
-}
-
-/* ── Almanac ── */
-.almanac-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 6px;
-  line-height: 2.0;
-  color: #aabbcc;
-  margin: 4px 0;
-}
-.alm-label { flex-shrink: 0; width: 52px; color: #88aacc; }
-.alm-val { flex: 1; color: #cfe0ff; }
-.alm-btn { padding: 3px 5px; font-size: 7px; line-height: 1; }
-.alm-shower {
-  font-size: 6px;
-  color: #ffcc66;
-  line-height: 2.2;
-  margin-top: 4px;
-}
-
-.panel-footer {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #334466;
-  text-align: center;
-}
-
-/* ── Pixel button ── */
-.pixel-btn {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
-  background: rgba(20, 30, 60, 0.9);
-  color: #aaddff;
-  border: 2px solid #4466aa;
-  padding: 5px 8px;
-  cursor: pointer;
-  image-rendering: pixelated;
-  line-height: 1.8;
-  letter-spacing: 0.5px;
-  transition: background 0.1s, color 0.1s;
-}
-
-.pixel-btn:hover {
-  background: rgba(40, 60, 120, 0.9);
-  color: #ffffff;
-  border-color: #88aaff;
-}
-
-.pixel-btn:active {
-  background: rgba(60, 90, 180, 0.9);
-}
-
-/* ── Lore caption ── */
-#lore-caption {
-  position: fixed;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  background: rgba(10, 10, 30, 0.85);
-  border: 2px solid #4466aa;
-  padding: 8px 14px;
-  max-width: 560px;
-  width: calc(100vw - 40px);
-  font-size: 7px;
-  color: #88aacc;
-  line-height: 2.0;
-  text-align: center;
-  image-rendering: pixelated;
-}
-
-/* ── Modal ── */
-#modal-about {
+/* ── Title card ── */
+#title-card {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(5, 5, 20, 0.80);
+  pointer-events: none;
+  animation: tc-in 1.2s ease-out both;
+  transition: opacity 0.9s ease-in;
+}
+#title-card[hidden] { display: none; }
+
+#fade {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: #060d18;
+  pointer-events: none;
+  transition: opacity 1.4s ease-out;
+}
+#fade.gone { opacity: 0; }
+#title-card.gone { opacity: 0; }
+
+.tc-title {
+  font-size: clamp(22px, 6vw, 56px);
+  color: var(--gold);
+  letter-spacing: 0.08em;
+  text-shadow: 4px 4px 0 var(--gold-deep), 0 0 24px rgba(255, 200, 90, 0.25);
 }
 
-#modal-box {
-  background: rgba(10, 12, 30, 0.97);
-  border: 3px solid #4466aa;
-  padding: 20px;
-  max-width: 580px;
-  width: calc(100vw - 40px);
-  max-height: 85vh;
-  overflow-y: auto;
-  font-size: 7px;
-  line-height: 2.2;
-  color: #ccddbb;
+@keyframes tc-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
 }
 
-.modal-title {
-  font-size: 10px;
-  color: #ffdd66;
-  margin-bottom: 12px;
-  text-align: center;
-  letter-spacing: 1px;
+/* ── Day/night dial ── */
+#dial {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  width: 76px;
+  height: 42px;
+  overflow: hidden;
+  border-bottom-width: 4px;
+  pointer-events: none;
+  transition: opacity 0.6s;
+}
+#dial-wheel {
+  position: absolute;
+  left: 50%;
+  top: 36px;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  will-change: transform;
+}
+#dial-wheel [data-icon] {
+  position: absolute;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+}
+.dial-sun  { top: 0;    color: var(--gold); }
+.dial-moon { bottom: 0; color: #dfe6ff; transform: rotate(180deg); }
+
+/* ── HUD ── */
+#hud {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 20;
+  max-width: calc(100vw - 24px);
+  transition: opacity 0.6s;
 }
 
-.modal-table-title {
-  font-size: 7px;
-  color: #88aadd;
-  margin: 14px 0 6px;
-  letter-spacing: 1px;
-}
-
-.lore-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 6px 0;
-}
-
-.lore-table td {
-  padding: 4px 6px;
-  border: 1px solid #334466;
-  font-size: 6px;
-  line-height: 2.0;
-  color: #aabbcc;
-}
-
-.lore-table tr:nth-child(even) td {
-  background: rgba(40, 60, 100, 0.2);
-}
-
-#modal-box p {
-  margin: 6px 0;
-  font-size: 6px;
-  line-height: 2.2;
-  color: #99aabb;
-}
-
-#modal-close {
-  display: block;
-  margin: 16px auto 0;
-}
-
-/* ── Postcards / preset buttons ── */
-.postcards-wrap {
+#dock {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.preset-btn {
-  font-size: 6px;
-  padding: 4px 6px;
-  margin: 0;
-  line-height: 1.6;
-}
-
-/* ── Reset all link (in About modal) ── */
-.reset-all-link {
-  color: #cc6655;
-  text-decoration: none;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 6px;
-  line-height: 2.0;
-}
-
-.reset-all-link:hover {
-  color: #ff8877;
-  text-decoration: underline;
-}
-
-/* ── Radio group row (view mode) ── */
-.radio-group-row {
-  display: flex;
-  gap: 8px;
-  margin: 4px 0;
-}
-
-/* ── Control row multi-button spacing ── */
-.control-row {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
   align-items: center;
-  margin: 4px 0;
+  gap: 2px;
+  padding: 4px 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+#dock::-webkit-scrollbar { display: none; }
+
+.sep {
+  flex: none;
+  width: 2px;
+  height: 24px;
+  margin: 0 6px;
+  background: var(--edge-soft);
+}
+
+.tool {
+  flex: none;
+  width: var(--tool);
+  height: var(--tool);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--ink-dim);
+  cursor: pointer;
+  font: inherit;
+  transition: color 0.15s, background-color 0.15s, transform 0.1s;
+}
+.tool:hover { color: var(--ink); background: var(--hover); }
+.tool:active { transform: translateY(1px); }
+.tool:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+/* On: lit gold. Buttons (pause, cycles, popover) count as on. */
+button.tool { color: var(--ink); }
+.tool:has(> input:checked) { color: var(--gold); }
+.tool:has(> input:disabled) { opacity: 0.3; cursor: default; }
+.tool.open { color: var(--gold); background: var(--hover); }
+
+/* Day-of-year track */
+.season {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  color: var(--ink-dim);
+}
+.season [data-icon] { width: 16px; height: 16px; }
+.season [data-icon]:first-child { color: var(--gold); }
+.season [data-icon]:last-child  { color: #bfe3ff; }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 96px;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--edge-soft);
+  border: 2px solid #1a2244;
+}
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: var(--edge-soft);
+  border: 2px solid #1a2244;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 16px;
+  margin-top: -7px;
+  background: var(--gold);
+  border: 2px solid var(--gold-deep);
+  border-radius: 0;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 16px;
+  background: var(--gold);
+  border: 2px solid var(--gold-deep);
+  border-radius: 0;
+}
+
+/* ── Popovers ── */
+.pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: pop-in 0.14s ease-out;
+}
+.pop[hidden] { display: none; }
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.pop .grid {
+  display: grid;
+  grid-template-columns: repeat(4, var(--tool));
+  gap: 2px;
+}
+.pop .grid + .grid {
+  padding-top: 4px;
+  border-top: 2px solid var(--edge-soft);
+}
+.pop .row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 2px solid var(--edge-soft);
+}
+.pop .row .dim { width: 16px; height: 16px; margin-left: 8px; color: var(--ink-dim); }
+.pop .row input[type="range"] { flex: 1; width: 72px; }
+
+#pop-alm .grid { grid-template-columns: repeat(5, var(--tool)); }
+.preset-btn[data-tone="blood"] { color: #ff7a5c; }
+
+/* Info card */
+.info { width: 248px; padding: 12px; gap: 10px; }
+.info-title {
+  font-size: 10px;
+  color: var(--gold);
+  text-shadow: 2px 2px 0 var(--gold-deep);
+}
+.info p {
+  font-size: 8px;
+  line-height: 1.9;
+  color: var(--ink);
+}
+.info .row { justify-content: space-between; padding-top: 8px; }
+.info-link {
+  font-size: 8px;
+  color: #8fd0ff;
+  text-decoration: none;
+}
+.info-link:hover { color: var(--gold); text-decoration: underline; }
+
+/* ── Hover label ── */
+#tip {
+  position: fixed;
+  z-index: 60;
+  padding: 6px 8px;
+  font-size: 8px;
+  color: var(--ink);
+  background: var(--panel-solid);
+  border: 2px solid var(--edge);
+  white-space: nowrap;
+  pointer-events: none;
+}
+#tip[hidden] { display: none; }
+
+/* ── Idle and hidden HUD ── */
+body.idle #hud:not(:hover):not(:focus-within) { opacity: 0.22; }
+body.idle #dial { opacity: 0.5; }
+body.hud-off #hud,
+body.hud-off #dial,
+body.hud-off #tip { opacity: 0 !important; pointer-events: none; }
 
 /* ── Photo mode ── */
-#photo-exit {
-  display: none;
+#photo-bar {
   position: fixed;
-  bottom: 16px;
+  top: 16px;
   right: 16px;
   z-index: 50;
-  font-size: 6px;
-  color: rgba(180, 200, 220, 0.6);
-  font-family: 'Press Start 2P', monospace;
-  line-height: 2.2;
-  text-align: right;
-  pointer-events: auto;
-  cursor: pointer;
-  gap: 6px;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.photo-mode #photo-exit {
-  display: flex;
-}
-
-.photo-mode #title-block,
-.photo-mode #right-panel,
-.photo-mode #lore-caption,
-.photo-mode #btn-collapse,
-.photo-mode #observer-box,
-.photo-mode #routes-box {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s;
-}
-
-/* ── Scrollbar styling ── */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: rgba(10, 10, 30, 0.5);
-}
-::-webkit-scrollbar-thumb {
-  background: #334466;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #4466aa;
-}
-
-/* ── Lore tooltip ── */
-#tooltip {
   display: none;
-  position: fixed;
-  z-index: 50;
-  background: rgba(10, 10, 30, 0.95);
-  border: 1px solid #4466aa;
-  padding: 7px 10px;
-  max-width: 260px;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 6px;
-  color: #88aacc;
-  line-height: 2.0;
-  pointer-events: none;
-  word-wrap: break-word;
+  gap: 2px;
+  padding: 4px;
 }
+.photo-mode #photo-bar { display: flex; }
+.photo-mode #hud,
+.photo-mode #dial,
+.photo-mode #tip,
+.photo-mode #title-card { display: none; }
 
-/* ── Observer box ── */
-#observer-box {
-  position: fixed;
-  bottom: 80px;
-  left: 16px;
-  z-index: 10;
-  background: rgba(10, 10, 30, 0.85);
-  border: 2px solid #4466aa;
-  padding: 8px 12px;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 6px;
-  color: #aaddbb;
-  line-height: 2.4;
-  white-space: pre;
-}
-
-/* ── Routes box (stacked above the observer box) ── */
-#routes-box {
-  position: fixed;
-  bottom: 152px;
-  left: 16px;
-  z-index: 10;
-  background: rgba(10, 10, 30, 0.85);
-  border: 2px solid #4466aa;
-  padding: 8px 12px;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 6px;
-  color: #ccddee;
-  line-height: 2.4;
-  white-space: pre;
-}
-
-#routes-box .rb-flat { color: #ffdd44; }
-#routes-box .rb-real { color: #66e0e0; }
-
-/* ── Small screens / touch ──────────────────────────────────────────────────
-   Same layout, bigger type and tap targets; the right panel starts collapsed
-   (ui.js) and becomes nearly full-width when opened. */
+/* ── Small screens and touch ── */
 @media (max-width: 640px), (pointer: coarse) {
-  #title-block { top: 8px; left: 8px; padding: 8px 10px; max-width: 210px; }
-  #title { font-size: 10px; }
-  #subtitle { display: none; }
-  #clock-display, #sun-speed { font-size: 8px; }
-
-  #btn-collapse { top: 8px; right: 8px; font-size: 10px; padding: 8px 12px; }
-  #right-panel {
-    top: 48px; right: 8px;
-    width: min(280px, calc(100vw - 16px));
-    max-height: calc(100vh - 64px);
-    padding: 10px 12px;
-  }
-  .section-title { font-size: 8px; }
-  .checkbox-row, .radio-row { font-size: 9px; line-height: 2.4; padding: 4px 0; gap: 10px; }
-  .checkbox-row input, .radio-row input { width: 18px; height: 18px; }
-  .slider-row, .label-small, .almanac-row, .alm-shower { font-size: 8px; }
-  .slider-row input[type="range"] { height: 8px; }
-  .alm-label { width: 60px; }
-  .alm-btn { padding: 6px 8px; font-size: 9px; }
-  .pixel-btn { font-size: 9px; padding: 8px 10px; }
-  .preset-btn { font-size: 8px; padding: 6px 8px; }
-
-  #lore-caption { bottom: 8px; width: calc(100vw - 16px); font-size: 8px; padding: 8px 10px; line-height: 1.9; }
-  #observer-box, #routes-box { left: 8px; font-size: 7px; padding: 6px 8px; max-width: calc(100vw - 16px); overflow-x: auto; }
-  #observer-box { bottom: 96px; }
-  #routes-box { bottom: 170px; }
-  #photo-exit { font-size: 8px; }
-
-  #modal-box { padding: 14px; font-size: 8px; }
-  #modal-box p, .lore-table td, .reset-all-link { font-size: 8px; }
-  .modal-title { font-size: 11px; }
+  :root { --tool: 44px; --icon: 24px; }
+  #hud { bottom: 10px; width: calc(100vw - 16px); max-width: 420px; }
+  #dock { flex-wrap: wrap; justify-content: center; row-gap: 2px; }
+  #dock .sep { display: none; }
+  .season input[type="range"] { width: 72px; }
+  #tip { display: none !important; }
+  #dial { top: 10px; left: 10px; }
 }

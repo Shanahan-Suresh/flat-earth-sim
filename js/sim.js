@@ -4,7 +4,6 @@
 export const CONSTANTS = {
   // Scale: 1 unit = 1,245 miles
   DISC_RADIUS: 10,          // 12,450 mi
-  DISC_HEIGHT: 0.3,
   ICE_WALL_RADIUS: 9.9,
   ICE_WALL_HEIGHT_MIN: 0.15,
   ICE_WALL_HEIGHT_MAX: 0.35,
@@ -13,7 +12,6 @@ export const CONSTANTS = {
   DOME_RADIUS: 10.4,
   DOME_Y_SCALE: 0.32,       // flattened; apex ~3.3 units (~4,100 mi)
 
-  STAR_COUNT: 800,
   STAR_RADIUS: 10.2,        // just inside dome
   STAR_Y_SCALE: 0.32,
 
@@ -63,7 +61,7 @@ export const CONSTANTS = {
 
   // Day patch radius (scene units): matches the sunBeam cone's base radius in sky.js.
   // Anything inside this planar distance from the sun's ground point is "in daylight" —
-  // drives observer-box day/night icons and city-lights extinguishing.
+  // drives city-lights extinguishing.
   DAY_PATCH_RADIUS: 2.6,
 
   // City lights: 13 population centers lit by warm glow once outside the day patch.
@@ -85,9 +83,11 @@ export const CONSTANTS = {
   PLANE_ALTITUDE: 0.45,   // scene units above the disc
   // Ship loops: slow ocean circuits, positioned/sized by lore-plausible open water.
   SHIP_LOOPS: [
-    { lat: -10, lon: -140, r: 1.1, days: 6 },  // South Pacific
-    { lat: -30, lon: -20,  r: 0.9, days: 5 },  // South Atlantic
-    { lat: -10, lon:  85,  r: 0.8, days: 4 },  // Indian Ocean
+    { lat: -10, lon: -140, r: 1.1, days: 3 },    // South Pacific
+    { lat: -30, lon: -20,  r: 0.9, days: 2.5 },  // South Atlantic
+    { lat: -10, lon:  85,  r: 0.8, days: 2 },    // Indian Ocean
+    { lat:  42, lon: -38,  r: 0.6, days: 2.2 },  // North Atlantic
+    { lat:  30, lon: -160, r: 0.9, days: 3 },    // North Pacific
   ],
 
   // Winter creep: a frost ring that grows toward the ice wall, peaking at the
@@ -383,8 +383,8 @@ export function frostFactor(day) {
 // centre, south pole (lat -90) at the disc edge — Antarctica IS the rim / ice
 // wall. 180° of latitude = DISC_RADIUS = 12,450 mi, the same mile scale the
 // sun-path constants use (Cancer at 3.7 units, Capricorn at 6.3). Everything
-// placed by lat/lon (map texture, routes, observers, cities, ships) goes
-// through here; makeWorldMapTexture converts units → canvas px.
+// placed by lat/lon (coastlines, routes, observers, cities, ships) goes
+// through here; terrain.js projects the coastline mask with it.
 export function latLonToDisc(lat, lon) {
   const r = (90 - lat) / 180 * CONSTANTS.DISC_RADIUS;
   const lonRad = lon * DEG;

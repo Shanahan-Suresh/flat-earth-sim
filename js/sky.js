@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CONSTANTS, eclipseAlignmentFactor, activeShower } from './sim.js';
-import { makeMoonPhaseTextures, makeTwilightTexture, makeAuroraTexture, makeSparkleTexture } from './textures.js';
+import { makeMoonPhaseTextures, makeGlowSprite } from './textures.js';
+import { surfaceUniforms } from './surface.js';
 import { buildRandom } from './rng.js';
 
 // Point on the star shell given azimuth (deg) and polar angle from the dome
@@ -18,7 +19,80 @@ export function mapDomeCoord(azDeg, polarDeg) {
   );
 }
 
+// Backdrop: a big inverted sphere whose gradient warms on the side facing the sun
+const BACKDROP_VERT = `
+varying vec3 vDir;
+void main() {
+  vDir = normalize(position);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+const BACKDROP_FRAG = `
+uniform float uDay;
+uniform float uGround;
+uniform vec2 uSunDir;
+uniform sampler2D uNebula;
+varying vec3 vDir;
+void main() {
+  float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
+  // From the diorama the day side stays a deep navy; standing on the ground under the sun it is a blue sky
+  vec3 dayTop = mix(vec3(0.03, 0.06, 0.16), vec3(0.08, 0.22, 0.58), uGround);
+  vec3 dayLow = mix(vec3(0.09, 0.10, 0.20), vec3(0.32, 0.50, 0.78), uGround);
+  vec3 top = mix(vec3(0.012, 0.012, 0.045), dayTop, uDay);
+  vec3 low = mix(vec3(0.04, 0.03, 0.085), dayLow, uDay);
+  vec3 flo = vec3(0.01, 0.02, 0.04);
+  vec3 c = h > 0.5 ? mix(low, top, smoothstep(0.5, 0.95, h)) : mix(flo, low, smoothstep(0.15, 0.5, h));
+  // Painted night sky (AI-generated, assets/tex/nebula.webp) above the horizon, on the night side
+  vec2 nuv = vec2(atan(vDir.z, vDir.x) / 6.2832 + 0.5, clamp(asin(clamp(vDir.y, -1.0, 1.0)) / 1.5708, 0.0, 1.0) * 0.92 + 0.04);
+  vec3 neb = texture2D(uNebula, nuv).rgb;
+  float above = smoothstep(-0.05, 0.12, vDir.y);
+  c = mix(c, neb * 1.35, above * (1.0 - uDay * 0.6) * 0.95);
+  // Warm glow low on the horizon, on the side the sun is
+  float toward = max(dot(normalize(vDir.xz + 1e-5), uSunDir), 0.0);
+  float horizon = exp(-abs(vDir.y - 0.02) * 9.0);
+  c += vec3(0.42, 0.20, 0.10) * pow(toward, 3.0) * horizon * (0.35 + 0.65 * uDay);
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
+// Star lamps hang on the dome's underside and shine down: full brightness from
+// under the dome, dimmer from outside it. Each lamp twinkles on its own phase.
+function lampify(mat) {
+  mat.onBeforeCompile = shader => {
+    shader.uniforms.uTime = surfaceUniforms.uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aPhase;\nuniform float uTime;\nvarying float vLamp;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vec3 wp = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vec3 down = -normalize(vec3(wp.x, wp.y / ${CONSTANTS.STAR_Y_SCALE.toFixed(2)}, wp.z));
+        float facing = dot(down, normalize(cameraPosition - wp));
+        vLamp = mix(0.3, 1.0, smoothstep(-0.2, 0.35, facing)) * (0.65 + 0.35 * sin(uTime * 2.3 + aPhase * 7.0));`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vLamp;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= vLamp;');
+  };
+}
+
+function loadNebula() {
+  const tex = new THREE.TextureLoader().load('assets/tex/nebula.webp');
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
 export function buildSky(scene) {
+  const backdrop = new THREE.Mesh(
+    new THREE.SphereGeometry(120, 32, 16),
+    new THREE.ShaderMaterial({
+      uniforms: { uDay: { value: 0 }, uGround: { value: 0 }, uSunDir: { value: new THREE.Vector2(1, 0) }, uNebula: { value: loadNebula() } },
+      vertexShader: BACKDROP_VERT,
+      fragmentShader: BACKDROP_FRAG,
+      side: THREE.BackSide,
+      depthWrite: false,
+    })
+  );
+  backdrop.renderOrder = -10;
+  scene.add(backdrop);
+
   // ── Star Wheel ──────────────────────────────────────────────────────────────
   // Two layers: ~400 faint white + ~100 brighter pale-gold — a delicate dome
   // of fireflies, not confetti.
@@ -38,17 +112,21 @@ export function buildSky(scene) {
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const phases = new Float32Array(count);
+    for (let i = 0; i < count; i++) phases[i] = buildRandom() * 6.283;
+    geo.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
     const mat = new THREE.PointsMaterial({
       color, size, opacity,
       sizeAttenuation: false,
       transparent: true,
       depthWrite: false,
     });
+    lampify(mat);
     return new THREE.Points(geo, mat);
   }
 
-  starGroup.add(makeStarLayer(400, 0xf0ead8, 1.5, 0.35)); // faint field
-  starGroup.add(makeStarLayer(100, 0xffeec0, 2, 0.7));    // brighter pale-gold
+  starGroup.add(makeStarLayer(400, 0xf0ead8, 1, 0.45));  // faint field (1 pixel)
+  starGroup.add(makeStarLayer(100, 0xffeec0, 1, 0.95));  // brighter pale-gold
 
   // ── Constellations ──────────────────────────────────────────────────────────
   // Lamps hung on the dome's underside — fixed figures in the star wheel, so
@@ -77,9 +155,12 @@ export function buildSky(scene) {
 
   const constellationStarGeo = new THREE.BufferGeometry();
   constellationStarGeo.setAttribute('position', new THREE.Float32BufferAttribute(constellationStarPositions, 3));
+  constellationStarGeo.setAttribute('aPhase', new THREE.BufferAttribute(
+    Float32Array.from({ length: constellationStarPositions.length / 3 }, (_, i) => (i * 2.399) % 6.283), 1));
   const constellationStarMat = new THREE.PointsMaterial({
-    color: 0xcfe0ff, size: 2.5, sizeAttenuation: false, transparent: true,
+    color: 0xcfe0ff, size: 2, sizeAttenuation: false, transparent: true,
   });
+  lampify(constellationStarMat);
   const constellationStars = new THREE.Points(constellationStarGeo, constellationStarMat);
 
   starGroup.add(constellationLines);
@@ -119,7 +200,8 @@ export function buildSky(scene) {
 
   // ── Sun ─────────────────────────────────────────────────────────────────────
   const sunGeo = new THREE.SphereGeometry(CONSTANTS.SUN_RADIUS, 8, 6);
-  const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd44 });
+  // Brighter than white so only the sun (not the lit ground) crosses the bloom threshold
+  const sunMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(5.0, 3.9, 1.6) });
   const sunMesh = new THREE.Mesh(sunGeo, sunMat);
 
   const sunGlowGeo = new THREE.SphereGeometry(CONSTANTS.SUN_RADIUS * 1.6, 8, 6);
@@ -132,31 +214,62 @@ export function buildSky(scene) {
   });
   const sunGlowMesh = new THREE.Mesh(sunGlowGeo, sunGlowMat);
 
+  const glowTex = makeGlowSprite();
+  const sunHalo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: new THREE.Color(1.6, 1.15, 0.55), transparent: true, opacity: 0.55,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  sunHalo.scale.set(2.2, 2.2, 1);
+
   const sunGroup = new THREE.Group();
   sunGroup.add(sunMesh);
   sunGroup.add(sunGlowMesh);
+  sunGroup.add(sunHalo);
   scene.add(sunGroup);
 
   // Warm-tinted, tuned so map colors show warmly inside the day patch
   // rather than blowing out to white at the center. Angle widened so the
   // lit circle reads as roughly a quarter-to-third of the disc radius.
-  const sunLight = new THREE.SpotLight(0xffe0a8, 280);
+  const sunLight = new THREE.SpotLight(0xffe6bc, 24);
   sunLight.angle = 0.66;
   sunLight.penumbra = 0.6;
   sunLight.decay = 1.2;
   sunLight.target.position.set(0, 0, 0);
+  // The sun is the key light and the only shadow caster: its spotlight is the day patch
+  sunLight.castShadow = true;
+  // shadow map size comes from the look (main.js)
+  sunLight.shadow.camera.near = 0.5;
+  sunLight.shadow.camera.far = 8;
+  sunLight.shadow.bias = -0.0004;
+  sunLight.shadow.normalBias = 0.02;
   scene.add(sunLight);
   scene.add(sunLight.target);
 
   // Truncated cone: 0.1 at the sun flaring to ~2.6 (day-patch radius) at the disc
   const sunBeamGeo = new THREE.CylinderGeometry(0.1, 2.6, 2.4, 16, 1, true);
-  const sunBeamMat = new THREE.MeshBasicMaterial({
-    color: 0xffdd44,
+  // Soft light cone: fades toward the ground and at its silhouette edges
+  const sunBeamMat = new THREE.ShaderMaterial({
     transparent: true,
-    opacity: 0.07,
     side: THREE.DoubleSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    vertexShader: `
+      varying vec2 vUv;
+      varying float vEdge;
+      void main() {
+        vUv = uv;
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vec3 n = normalize(mat3(modelMatrix) * normal);
+        vEdge = abs(dot(n, normalize(cameraPosition - wp.xyz)));
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
+    fragmentShader: `
+      varying vec2 vUv;
+      varying float vEdge;
+      void main() {
+        float a = 0.16 * pow(vEdge, 1.6) * (0.35 + 0.65 * vUv.y);
+        gl_FragColor = vec4(vec3(1.0, 0.86, 0.5) * a, a);
+      }`,
   });
   const sunBeamMesh = new THREE.Mesh(sunBeamGeo, sunBeamMat);
   const sunBeamGroup = new THREE.Group();
@@ -176,11 +289,18 @@ export function buildSky(scene) {
   const moonSprite = new THREE.Sprite(moonMat);
   moonSprite.scale.set(CONSTANTS.MOON_RADIUS * 2.2, CONSTANTS.MOON_RADIUS * 2.2, 1);
 
+  const moonHalo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: 0x8fa8e8, transparent: true, opacity: 0.35,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  moonHalo.scale.set(1.3, 1.3, 1);
+
   const moonGroup = new THREE.Group();
+  moonGroup.add(moonHalo);
   moonGroup.add(moonSprite);
   scene.add(moonGroup);
 
-  const moonLight = new THREE.SpotLight(0x8899cc, 55);
+  const moonLight = new THREE.SpotLight(0x8899cc, 7);
   moonLight.angle = 0.5;
   moonLight.penumbra = 0.8;
   moonLight.decay = 1.5;
@@ -208,83 +328,39 @@ export function buildSky(scene) {
   shadowObjGroup.visible = false;
   scene.add(shadowObjGroup);
 
-  // ── Twilight Ring ────────────────────────────────────────────────────────────
-  // Soft warm-orange halo at the sun's ground point, sitting just outside the
-  // bright day patch. Plane footprint ≈ 6.5 units → orange band at r≈2.0–2.6.
-  const twilightTex = makeTwilightTexture();
-  const twilightMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(6.5, 6.5),
-    new THREE.MeshBasicMaterial({
-      map: twilightTex,
-      transparent: true,
-      opacity: 0.35,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-  twilightMesh.rotation.x = -Math.PI / 2;
-  twilightMesh.position.y = 0.16;
-  scene.add(twilightMesh);
-
-  // ── Aurora Curtains ──────────────────────────────────────────────────────────
-  // 8 planes evenly spaced around the disc rim (radius ≈ 9.85), facing inward,
-  // each with its own material clone so we can scroll offset independently.
-  const auroraBaseTex = makeAuroraTexture();
+  // ── Aurora ──────────────────────────────────────────────────────────────────
+  // One curtain ring just inside the rim: folds of green fading to violet,
+  // drifting slowly; dimmer on the side the sun is on.
+  const auroraMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: surfaceUniforms.uTime, uSunAng: { value: 0 } },
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `
+      uniform float uTime, uSunAng;
+      varying vec2 vUv;
+      void main() {
+        float ang = vUv.x * 6.2832;
+        float fold = 0.5 + 0.5 * sin(ang * 23.0 + sin(ang * 5.0 + uTime * 0.35) * 3.0 + uTime * 0.25);
+        float bands = 0.55 + 0.45 * sin(ang * 61.0 - uTime * 0.9 + fold * 4.0);
+        float curtain = smoothstep(0.25, 0.9, fold) * bands;
+        float h = vUv.y;
+        float body = smoothstep(0.0, 0.18, h) * (1.0 - smoothstep(0.45, 1.0, h));
+        vec3 col = mix(vec3(0.25, 1.0, 0.55), vec3(0.65, 0.35, 1.0), smoothstep(0.35, 0.95, h));
+        float awaySun = 0.35 + 0.65 * smoothstep(-0.2, 0.8, -cos(ang - uSunAng));
+        float a = curtain * body * awaySun * 0.6;
+        gl_FragColor = vec4(col * a, a);
+      }`,
+  });
+  const auroraMesh = new THREE.Mesh(new THREE.CylinderGeometry(9.7, 9.95, 1.1, 128, 1, true), auroraMat);
+  auroraMesh.position.y = 0.95;
   const auroraGroup = new THREE.Group();
-  const AURORA_COUNT = 8;
-  const AURORA_RADIUS = 9.85;
-  const auroraPlanes = [];
-
-  for (let i = 0; i < AURORA_COUNT; i++) {
-    const angle = (i / AURORA_COUNT) * Math.PI * 2;
-    const mat = new THREE.MeshBasicMaterial({
-      map: auroraBaseTex.clone(),
-      transparent: true,
-      opacity: 0.28,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    // Each clone needs its own offset instance
-    mat.map.needsUpdate = true;
-
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.4, 0.9),
-      mat
-    );
-    // Position at rim, face inward (tangential)
-    mesh.position.set(
-      Math.cos(angle) * AURORA_RADIUS,
-      0.45 + 0.9 / 2, // base just above ice wall top
-      Math.sin(angle) * AURORA_RADIUS
-    );
-    mesh.rotation.y = -angle + Math.PI / 2; // face tangentially toward center
-
-    // Per-plane speed and base tilt for sway
-    mesh.userData.speed = 0.02 + (i % 4) * 0.0075;
-    mesh.userData.baseTilt = (i % 3 - 1) * 0.08; // slight random tilt
-    auroraPlanes.push(mesh);
-    auroraGroup.add(mesh);
-  }
+  auroraGroup.add(auroraMesh);
   scene.add(auroraGroup);
-
-  // ── Sun Glitter Shimmer ──────────────────────────────────────────────────────
-  // Sparkle dot field scrolled across the day patch for a glittery water sheen.
-  const sparkleTex = makeSparkleTexture();
-  sparkleTex.repeat.set(6, 6);
-  const glitterMesh = new THREE.Mesh(
-    new THREE.CircleGeometry(2.2, 32),
-    new THREE.MeshBasicMaterial({
-      map: sparkleTex,
-      transparent: true,
-      opacity: 0.12,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-  glitterMesh.rotation.x = -Math.PI / 2;
-  glitterMesh.position.y = 0.155;
-  scene.add(glitterMesh);
 
   // ── Planets (Tychonic epicycles) ─────────────────────────────────────────────
   const planetGroups = CONSTANTS.PLANETS.map(p => {
@@ -302,6 +378,7 @@ export function buildSky(scene) {
   const starBaseOpacities = starLayers.map(p => p.material.opacity);
 
   return {
+    backdrop,
     sunGroup,
     sunLight,
     sunBeamGroup,
@@ -315,10 +392,8 @@ export function buildSky(scene) {
     starLayers,
     starBaseOpacities,
     planetGroups,
-    twilightMesh,
     auroraGroup,
-    auroraPlanes,
-    glitterMesh,
+    auroraMat,
     constellationLines,
     constellationStars,
     constellationLinesBaseOpacity,
@@ -331,10 +406,11 @@ export function updateSky(sky, clock, toggles) {
   const { sunGroup, sunLight, sunBeamGroup, moonGroup, moonLight,
           starGroup, starLayers, starBaseOpacities,
           shadowObjGroup, planetGroups, moonMat, moonFrames,
-          twilightMesh, auroraGroup, auroraPlanes, glitterMesh } = sky;
+          auroraGroup, auroraMat } = sky;
 
   // Sun position
   const sx = clock.sunX, sz = clock.sunZ, sy = CONSTANTS.SUN_ALTITUDE;
+  sky.backdrop.material.uniforms.uSunDir.value.set(sx, sz).normalize();
   sunGroup.position.set(sx, sy, sz);
   sunLight.position.set(sx, sy, sz);
   sunLight.target.position.set(sx, 0, sz);
@@ -371,8 +447,8 @@ export function updateSky(sky, clock, toggles) {
     const g = 1.0 - ef * (1.0 - 0x44 / 0xff); // 1 → 0x44/0xff
     const b = 1.0 - ef * (1.0 - 0x33 / 0xff); // 1 → 0x33/0xff
     moonMat.color.setRGB(r, g, b);
-    // Moonlight: full intensity 55, dims to ~8 (15%) at peak eclipse
-    moonLight.intensity = 55 * (1 - ef * 0.85);
+    // Moonlight dims to 15% at peak eclipse
+    moonLight.intensity = 7 * (1 - ef * 0.85);
   }
 
   // Stars rotate sidereal
@@ -389,24 +465,10 @@ export function updateSky(sky, clock, toggles) {
   }
   shadowObjGroup.visible = toggles.shadowObject;
 
-  // ── Twilight ring — follow sun ground point ──────────────────────────────────
-  twilightMesh.position.x = sx;
-  twilightMesh.position.z = sz;
-
-  // ── Glitter shimmer — follow sun ground point, scroll offset ─────────────────
-  glitterMesh.position.x = sx;
-  glitterMesh.position.z = sz;
-  glitterMesh.material.map.offset.x = (clock.simTime * 0.11) % 1;
-  glitterMesh.material.map.offset.y = (clock.simTime * 0.07) % 1; // offset is a uniform; no re-upload needed
-
-  // ── Aurora curtains — scroll texture + sway ───────────────────────────────
+  // ── Aurora ─────────────────────────────────────────────────────────────────
   auroraGroup.visible = (toggles.aurora !== false);
-  if (auroraGroup.visible) {
-    auroraPlanes.forEach((plane, i) => {
-      plane.material.map.offset.x = (clock.simTime * plane.userData.speed) % 1;
-      plane.rotation.z = plane.userData.baseTilt + Math.sin(clock.simTime * 0.8 + i) * 0.05;
-    });
-  }
+  // Cylinder uv.x runs from +z toward +x; match it to the sun's azimuth
+  auroraMat.uniforms.uSunAng.value = Math.atan2(sx, sz);
 
   // Planets (Tychonic epicycles)
   planetGroups.forEach(({ group, config }) => {

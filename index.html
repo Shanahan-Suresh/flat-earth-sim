@@ -7,9 +7,9 @@
   <meta name="description" content="A cozy pixel-art simulation of the flat earth exactly as its believers describe it: spiralling sun, self-luminous moon, firmament dome, Shadow Object eclipses, ice wall. Not a debunk; a faithful render of the lore.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Flat Earth Sim">
-  <meta property="og:description" content="A cozy pixel-art diorama of the flat-earth consensus model — sourced lore, procedural everything, no build step.">
+  <meta property="og:description" content="A cozy pixel-art diorama of the flat-earth consensus model: sourced lore, a small living world, no build step.">
   <meta property="og:url" content="https://shanahan-suresh.github.io/flat-earth-sim/">
-  <meta property="og:image" content="https://shanahan-suresh.github.io/flat-earth-sim/screenshots/default.png">
+  <meta property="og:image" content="https://shanahan-suresh.github.io/flat-earth-sim/screenshots/og.jpg">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' shape-rendering='crispEdges'%3E%3Ccircle cx='16' cy='16' r='15' fill='%232e7ea0'/%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%23c8ecff' stroke-width='3'/%3E%3Ccircle cx='13' cy='12' r='4' fill='%236db35a'/%3E%3Ccircle cx='20' cy='19' r='3' fill='%236db35a'/%3E%3Ccircle cx='10' cy='20' r='2' fill='%236db35a'/%3E%3Ccircle cx='16' cy='16' r='1.5' fill='%23e8f4f8'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
@@ -24,245 +24,112 @@
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
-  <!-- Sky tint overlay — JS drives opacity for day/night warm gradient -->
-  <div id="sky-tint"></div>
-
   <!-- Canvas background -->
   <canvas id="canvas"></canvas>
+  <div id="fade"></div>
 
-  <!-- Top-left title block -->
-  <div id="title-block">
-    <div id="title">FLAT EARTH SIM</div>
-    <div id="subtitle">as believed, faithfully rendered</div>
-    <div id="clock-display">Day 172 · 12:00 · Jun · Summer</div>
-    <div id="sun-speed">Sun: 1,204 mph</div>
+  <!-- Title card: shown once on a plain load, fades out (ui.js) -->
+  <div id="title-card" hidden>
+    <div class="tc-title">FLAT EARTH</div>
   </div>
 
-  <!-- Collapse button (top right of panel area) -->
-  <button id="btn-collapse" class="pixel-btn">[–]</button>
-
-  <!-- Right control panel -->
-  <div id="right-panel">
-
-    <div class="panel-section">
-      <div class="section-title">★ THE HEAVENS</div>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-dome" checked>
-        <span>Dome / Firmament</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-clouds" checked>
-        <span>Clouds</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-sunbeam" checked>
-        <span>Sun Beam</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-shadow">
-        <span>Shadow Object</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-aurora" checked>
-        <span>Aurora</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-constellations" checked>
-        <span>Constellations</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-rain" checked>
-        <span>Rain</span>
-      </label>
-      <div class="label-small" style="margin-top:6px;">MODEL</div>
-      <div class="radio-group-row">
-        <label class="radio-row">
-          <input type="radio" name="model" id="model-monopole" value="monopole" checked>
-          <span>Monopole</span>
-        </label>
-        <label class="radio-row">
-          <input type="radio" name="model" id="model-bipolar" value="bipolar">
-          <span>Bipolar</span>
-        </label>
-      </div>
+  <!-- Day/night dial: sun and moon ride one wheel; sim time turns it -->
+  <div id="dial" class="frame" aria-hidden="true">
+    <div id="dial-wheel">
+      <i class="dial-sun" data-icon="sun"></i>
+      <i class="dial-moon" data-icon="moon"></i>
     </div>
+  </div>
 
-    <div class="panel-section">
-      <div class="section-title">◈ OVERLAYS</div>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-routes">
-        <span>Flight Routes</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-observers">
-        <span>Observers</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-traffic" checked>
-        <span>Ships &amp; Planes</span>
-      </label>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-lights" checked>
-        <span>City Lights</span>
-      </label>
-    </div>
-
-    <div class="panel-section">
-      <div class="section-title">◆ THE EDGE</div>
-      <label class="radio-row">
-        <input type="radio" name="edge" id="edge-icewall" value="icewall" checked>
-        <span>Ice Wall</span>
-      </label>
-      <label class="radio-row">
-        <input type="radio" name="edge" id="edge-waterfall" value="waterfall">
-        <span>Edge Waterfall</span>
-      </label>
-      <label class="radio-row">
-        <input type="radio" name="edge" id="edge-infinite" value="infinite">
-        <span>Infinite Plane</span>
-      </label>
-      <label class="radio-row">
-        <input type="radio" name="edge" id="edge-beyond" value="beyond">
-        <span>Lands Beyond</span>
-      </label>
-    </div>
-
-    <div class="panel-section">
-      <div class="section-title">⏱ TIME</div>
-      <div class="control-row">
-        <button id="btn-pause" class="pixel-btn">PAUSE</button>
-      </div>
-      <div class="slider-row">
-        <span>Speed</span>
-        <input type="range" id="slider-speed" min="0" max="20" value="1" step="0.25">
-        <span id="label-speed">1×</span>
-      </div>
-      <div class="slider-row">
-        <span>Day</span>
+  <!-- HUD: dock + popovers. Every state input lives in here (autosave listens on #hud). -->
+  <div id="hud">
+    <div id="dock" class="frame">
+      <button id="btn-pause" class="tool" data-tip="Pause"><i data-icon="pause"></i></button>
+      <button id="btn-speed" class="tool" data-tip="Speed"><i data-icon="speed1"></i></button>
+      <input type="range" id="slider-speed" class="vh" min="0" max="20" value="1" step="0.25" tabindex="-1">
+      <div class="season" data-tip="Season">
+        <i data-icon="sun"></i>
         <input type="range" id="slider-day" min="0" max="364" value="172">
+        <i data-icon="snow"></i>
       </div>
-      <div id="label-day" class="label-small">Day 172 · Jun · Summer</div>
+      <span class="sep"></span>
+      <button id="btn-edge" class="tool" data-tip="Ice wall"><i data-icon="wall"></i></button>
+      <button id="btn-view" class="tool" data-tip="Diorama"><i data-icon="diorama"></i></button>
+      <button id="btn-photo" class="tool" data-tip="Photo"><i data-icon="camera"></i></button>
+      <label class="tool" data-tip="Sound"><input type="checkbox" id="chk-audio" class="vh"><i data-icon="sound"></i></label>
+      <span class="sep"></span>
+      <button class="tool" data-pop="pop-sky" data-tip="Sky"><i data-icon="cloud"></i></button>
+      <button class="tool" data-pop="pop-map" data-tip="Map"><i data-icon="plane"></i></button>
+      <button class="tool" data-pop="pop-alm" data-tip="Almanac"><i data-icon="moon"></i></button>
+      <button class="tool" data-pop="pop-info" data-tip="About"><i data-icon="info"></i></button>
     </div>
 
-    <div class="panel-section">
-      <div class="section-title">☾ ALMANAC</div>
-      <div class="almanac-row">
-        <span class="alm-label">Full moon</span>
-        <span id="alm-fullmoon-val" class="alm-val">—</span>
-        <button id="btn-alm-fullmoon" class="pixel-btn alm-btn" title="Jump to next full moon">&gt;&gt;</button>
-      </div>
-      <div class="almanac-row">
-        <span class="alm-label">Eclipse</span>
-        <span id="alm-eclipse-val" class="alm-val">—</span>
-        <button id="btn-alm-eclipse" class="pixel-btn alm-btn" title="Jump to next lunar eclipse">&gt;&gt;</button>
-      </div>
-      <div class="almanac-row">
-        <span class="alm-label">Solstice</span>
-        <span id="alm-solstice-val" class="alm-val">—</span>
-        <button id="btn-alm-solstice" class="pixel-btn alm-btn" title="Jump to next solstice">&gt;&gt;</button>
-      </div>
-      <div id="alm-shower" class="alm-shower" style="display:none;"></div>
-    </div>
+    <!-- Radio groups behind the cycle buttons (the schema reads these) -->
+    <span class="vh">
+      <input type="radio" name="edge" id="edge-icewall" value="icewall" checked>
+      <input type="radio" name="edge" id="edge-waterfall" value="waterfall">
+      <input type="radio" name="edge" id="edge-infinite" value="infinite">
+      <input type="radio" name="edge" id="edge-beyond" value="beyond">
+      <input type="radio" name="view" id="view-diorama" value="diorama" checked>
+      <input type="radio" name="view" id="view-ground" value="ground">
+      <input type="radio" name="model" id="model-monopole" value="monopole" checked>
+      <input type="radio" name="model" id="model-bipolar" value="bipolar">
+    </span>
 
-    <div class="panel-section">
-      <div class="section-title">◈ LOOK</div>
-      <div class="slider-row">
-        <span>Pixels</span>
-        <input type="range" id="slider-pixel" min="2" max="8" value="4" step="1">
-        <span id="label-pixel">4</span>
+    <div id="pop-sky" class="pop frame" hidden>
+      <div class="grid">
+        <label class="tool" data-tip="Dome"><input type="checkbox" id="chk-dome" class="vh" checked><i data-icon="dome"></i></label>
+        <label class="tool" data-tip="Clouds"><input type="checkbox" id="chk-clouds" class="vh" checked><i data-icon="cloud"></i></label>
+        <label class="tool" data-tip="Rain"><input type="checkbox" id="chk-rain" class="vh" checked><i data-icon="rain"></i></label>
+        <label class="tool" data-tip="Sunbeam"><input type="checkbox" id="chk-sunbeam" class="vh" checked><i data-icon="beam"></i></label>
+        <label class="tool" data-tip="Aurora"><input type="checkbox" id="chk-aurora" class="vh" checked><i data-icon="aurora"></i></label>
+        <label class="tool" data-tip="Stars"><input type="checkbox" id="chk-constellations" class="vh" checked><i data-icon="stars"></i></label>
+        <label class="tool" data-tip="Shadow object"><input type="checkbox" id="chk-shadow" class="vh"><i data-icon="shadow"></i></label>
+        <button id="btn-model" class="tool" data-tip="One pole"><i data-icon="monopole"></i></button>
       </div>
-      <label class="checkbox-row">
-        <input type="checkbox" id="chk-audio">
-        <span>♪ Sound</span>
-      </label>
-      <div class="radio-group-row">
-        <label class="radio-row">
-          <input type="radio" name="view" id="view-diorama" value="diorama" checked>
-          <span>Diorama</span>
-        </label>
-        <label class="radio-row">
-          <input type="radio" name="view" id="view-ground" value="ground">
-          <span>Ground</span>
-        </label>
-      </div>
-      <div class="control-row">
-        <button id="btn-reset-cam" class="pixel-btn">↺ RESET CAM</button>
-        <button id="btn-photo" class="pixel-btn">📷 PHOTO</button>
-        <button id="btn-copy-link" class="pixel-btn" title="Copy a link that reproduces this exact view">🔗 COPY LINK</button>
+      <div class="row">
+        <i class="dim" data-icon="pixels"></i>
+        <input type="range" id="slider-pixel" min="2" max="8" value="4" step="1" data-tip="Pixel size">
+        <button id="btn-reset-cam" class="tool" data-tip="Reset view"><i data-icon="reset"></i></button>
+        <button id="btn-copy-link" class="tool" data-tip="Copy link"><i data-icon="link"></i></button>
       </div>
     </div>
 
-    <div id="section-postcards" class="panel-section">
-      <div class="section-title">✦ POSTCARDS</div>
-      <div id="postcards-wrap" class="postcards-wrap"></div>
+    <div id="pop-map" class="pop frame" hidden>
+      <div class="grid">
+        <label class="tool" data-tip="Flights"><input type="checkbox" id="chk-routes" class="vh"><i data-icon="routes"></i></label>
+        <label class="tool" data-tip="Pins"><input type="checkbox" id="chk-observers" class="vh"><i data-icon="pin"></i></label>
+        <label class="tool" data-tip="Traffic"><input type="checkbox" id="chk-traffic" class="vh" checked><i data-icon="plane"></i></label>
+        <label class="tool" data-tip="City lights"><input type="checkbox" id="chk-lights" class="vh" checked><i data-icon="lights"></i></label>
+      </div>
     </div>
 
-    <div class="panel-footer">
-      <button id="btn-about" class="pixel-btn">? ABOUT</button>
+    <div id="pop-alm" class="pop frame" hidden>
+      <div class="grid">
+        <button id="btn-alm-fullmoon" class="tool" data-tip="Full moon"><i data-icon="fullmoon"></i></button>
+        <button id="btn-alm-eclipse" class="tool" data-tip="Eclipse"><i data-icon="eclipse"></i></button>
+        <button id="btn-alm-solstice" class="tool" data-tip="Solstice"><i data-icon="solstice"></i></button>
+      </div>
+      <div id="postcards-wrap" class="grid"></div>
+    </div>
+
+    <div id="pop-info" class="pop frame info" hidden>
+      <div class="info-title">FLAT EARTH SIM</div>
+      <p>The flat earth as its believers describe it.</p>
+      <div class="row">
+        <a class="info-link" href="https://github.com/Shanahan-Suresh/flat-earth-sim#readme" target="_blank" rel="noopener">Sources &amp; lore</a>
+        <button id="btn-reset-all" class="tool" data-tip="Reset all"><i data-icon="reset"></i></button>
+      </div>
     </div>
   </div>
 
-  <!-- Flight route distances box (bottom-left, above observer box, visible when routes on) -->
-  <div id="routes-box" style="display:none;"></div>
+  <!-- Hover label (desktop) -->
+  <div id="tip" hidden></div>
 
-  <!-- Observer local time box (bottom-left, visible when observers on) -->
-  <div id="observer-box" style="display:none;"></div>
-
-  <!-- Photo mode exit hint (only visible in photo-mode) -->
-  <div id="photo-exit">
-    📷 <span>S = save</span> · <span>Esc = exit</span>
-    <button id="btn-save-png" class="pixel-btn">SAVE PNG</button>
-  </div>
-
-  <!-- Lore caption bar -->
-  <div id="lore-caption">
-    Consensus: a 150-ft Antarctic ice wall rings the disc and holds the oceans in — nothing falls off.
-  </div>
-
-  <!-- Lore tooltip (shown on hover over panel rows, desktop only) -->
-  <div id="tooltip"></div>
-
-  <!-- About modal -->
-  <div id="modal-about" style="display:none;">
-    <div id="modal-box">
-      <div class="modal-title">FLAT EARTH SIM</div>
-      <p>A faithful pixel-art render of the consensus flat-earth model as described by TFES (The Flat Earth Society) and related communities. Not a parody — an earnest diorama.</p>
-
-      <div class="modal-table-title">THE MODEL — LORE CONSTANTS</div>
-      <table class="lore-table">
-        <tr><td>Disc radius</td><td>12,450 mi</td></tr>
-        <tr><td>Ice wall height</td><td>~150 ft (lore)</td></tr>
-        <tr><td>Sun diameter</td><td>32 mi (upscaled ×13 for visibility)</td></tr>
-        <tr><td>Moon diameter</td><td>32 mi (self-luminous cold light)</td></tr>
-        <tr><td>Sun altitude</td><td>~3,000 mi</td></tr>
-        <tr><td>Sun path radius</td><td>4,600 mi (Jun 21) → 7,840 mi (Dec 21)</td></tr>
-        <tr><td>Sun ground speed</td><td>1,204 mph (Jun) → 2,052 mph (Dec)</td></tr>
-        <tr><td>Moon angular rate</td><td>347.81°/day → 29.53-day synodic month</td></tr>
-        <tr><td>Star wheel period</td><td>23.93 h sidereal</td></tr>
-        <tr><td>Dome apex</td><td>~3,100–6,000 mi est.</td></tr>
-        <tr><td>Synodic month</td><td>29.53 days (full-moon spacing)</td></tr>
-        <tr><td>Solstices</td><td>Day 172 (Jun 21) · Day 355 (Dec 21)</td></tr>
-        <tr><td>Meteor showers</td><td>Lanternfall (224) · Wheelwright's Sparks (349) · Dome-Menders (4)</td></tr>
-        <tr><td>Constellations</td><td>8 dome figures; The Hub rings Polaris</td></tr>
-      </table>
-
-      <div class="modal-table-title">DOCTRINE VS FLAVOUR</div>
-      <p>The constants above are sourced. The v1.2 colour — constellation and meteor-shower names, ship loops, the city set, the 14-hour plane legs — is invented decoration, labelled (flavour) in its tooltips; it decorates the model, it makes no claim about it.</p>
-
-      <div class="modal-table-title">WHAT CONSENSUS SAYS</div>
-      <p>Water does NOT fall off — the ice wall contains it. The edge waterfall is an outsider meme; flat earthers disavow it. Gravity is replaced by density &amp; buoyancy + Universal Acceleration (9.8 m/s² upward). The moon is self-luminous cold light. Eclipses are caused by the Shadow Object. Southern 24h daylight is denied by the community.</p>
-
-      <div class="modal-table-title">SOURCES</div>
-      <p>wiki.tfes.org · Wikipedia "Modern flat Earth beliefs" · NCSE "The Rim at the End of the World" · Blake Marnell "Flat Earth Sun Moon &amp; Zodiac Clock" · Rowbotham "Zetetic Astronomy" (1865)</p>
-
-      <div class="modal-table-title">TECH</div>
-      <p>Three.js 0.180.0 vendored · RenderPixelatedPass · All art procedural · Press Start 2P font (OFL) · MIT · Run: python -m http.server 8000 · Tests: node --test</p>
-
-      <div class="modal-table-title">SETTINGS</div>
-      <p><a id="btn-reset-all" href="#" class="reset-all-link">RESET ALL SETTINGS</a> — clears saved state and reloads with defaults.</p>
-
-      <button id="modal-close" class="pixel-btn">✕ CLOSE</button>
-    </div>
+  <!-- Photo mode controls -->
+  <div id="photo-bar" class="frame">
+    <button id="btn-save-png" class="tool" data-tip="Save"><i data-icon="save"></i></button>
+    <button id="btn-photo-exit" class="tool" data-tip="Back"><i data-icon="close"></i></button>
   </div>
 </body>
 </html>

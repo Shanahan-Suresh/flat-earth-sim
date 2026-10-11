@@ -1,7 +1,7 @@
 // js/audio.js — procedural ambient audio engine for flat-earth-sim
 // No binary assets. All sound is synthesized via WebAudio API.
 // Public API: initAudio(), setAudioEnabled(bool), setEdgeMode(mode), setDayFactor(f),
-//             setRainIntensity(f), setEdgeProximity(p)
+//             setRainIntensity(f), setEdgeProximity(p), uiSound(kind)
 
 let _ctx = null;          // AudioContext (created lazily on user gesture)
 let _masterGain = null;   // master gain → destination
@@ -35,6 +35,15 @@ let _birdTimer = null;
 // Foghorn — edge + proximity gated, scheduled recurring one-shots
 let _edgeProximity = 0;
 let _foghornTimer = null;
+
+// Generative music + UI sounds
+let _musicBus = null;     // plucks → echo → master
+let _uiGain = null;
+let _musicTimer = null;
+let _nextBeat = 0;        // AudioContext time of the next beat
+let _beat = 0;
+let _melodyStep = 4;      // index into PENTA
+let _dayF = 0.5;
 
 function _smoothstep(x) {
   x = Math.max(0, Math.min(1, x));
@@ -250,8 +259,115 @@ function buildGraph() {
   // ── 6. FOGHORN scheduler (started once; gates itself each firing) ────────
   _scheduleFoghorn();
 
+  // ── 7. MUSIC bus: soft lowpass + a dotted echo for space ─────────────────
+  _musicBus = ctx.createGain();
+  _musicBus.gain.setValueAtTime(0.55, now);
+  const musicTone = ctx.createBiquadFilter();
+  musicTone.type = 'lowpass';
+  musicTone.frequency.setValueAtTime(2600, now);
+  const echo = ctx.createDelay(2);
+  echo.delayTime.setValueAtTime(BEAT * 1.5, now);
+  const echoFeedback = ctx.createGain();
+  echoFeedback.gain.setValueAtTime(0.32, now);
+  const echoWet = ctx.createGain();
+  echoWet.gain.setValueAtTime(0.4, now);
+  _musicBus.connect(musicTone);
+  musicTone.connect(_masterGain);
+  musicTone.connect(echo);
+  echo.connect(echoFeedback);
+  echoFeedback.connect(echo);
+  echo.connect(echoWet);
+  echoWet.connect(_masterGain);
+
+  _uiGain = ctx.createGain();
+  _uiGain.gain.setValueAtTime(0.5, now);
+  _uiGain.connect(_masterGain);
+
   // Apply current edge mode now that graph is built
   _applyEdgeMode(_currentEdge, true);
+}
+
+// ── Internal: generative music ───────────────────────────────────────────────
+// A minor pentatonic over the A pad drone, so every note sits on the chord.
+// One soft bass bell per bar walks A, C, G, D; the melody random-walks the
+// scale, higher and busier by day, lower and sparser at night.
+const BEAT = 0.75;                                   // seconds (80 bpm)
+const PENTA = [220, 261.63, 293.66, 329.63, 392];    // A3 C4 D4 E4 G4
+const BASS_ROOTS = [110, 130.81, 98, 146.83];        // A2 C3 G2 D3
+const scaleNote = i => PENTA[((i % 5) + 5) % 5] * 2 ** Math.floor(i / 5);
+
+function _pluck(freq, t, level, decay, bus) {
+  const ctx = _ctx;
+  const osc = ctx.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(freq, t);
+  const shimmer = ctx.createOscillator();
+  shimmer.type = 'sine';
+  shimmer.frequency.setValueAtTime(freq * 2, t);
+  const shimmerGain = ctx.createGain();
+  shimmerGain.gain.setValueAtTime(0.25, t);
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.exponentialRampToValueAtTime(level, t + 0.008);
+  env.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+  osc.connect(env);
+  shimmer.connect(shimmerGain);
+  shimmerGain.connect(env);
+  env.connect(bus);
+  osc.start(t);
+  shimmer.start(t);
+  osc.stop(t + decay + 0.05);
+  shimmer.stop(t + decay + 0.05);
+}
+
+function _musicTick() {
+  _musicTimer = setTimeout(_musicTick, 200);
+  if (!_enabled || !_ctx || !_musicBus || _ctx.state !== 'running') return;
+  const ctx = _ctx;
+  if (_nextBeat < ctx.currentTime) _nextBeat = ctx.currentTime + 0.1;
+  while (_nextBeat < ctx.currentTime + 0.6) {
+    const t = _nextBeat;
+    if (_beat % 8 === 0) _pluck(BASS_ROOTS[(_beat / 8) % BASS_ROOTS.length], t, 0.22, 4.5, _musicBus);
+    const busy = 0.25 + 0.35 * _dayF;
+    if (Math.random() < busy) {
+      _melodyStep = Math.max(2, Math.min(12, _melodyStep + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]));
+      const lift = _dayF > 0.5 ? 5 : 0;              // an octave up by day
+      _pluck(scaleNote(_melodyStep + lift - 3), t + (Math.random() < 0.2 ? BEAT / 2 : 0), 0.09 + 0.05 * _dayF, 1.8, _musicBus);
+    }
+    _beat++;
+    _nextBeat += BEAT;
+  }
+}
+
+// ── Public: uiSound ──────────────────────────────────────────────────────────
+// Short plucks for HUD actions. Silent unless sound is on.
+const UI_NOTES = {
+  on:    [[659.25, 0], [880, 0.07]],
+  off:   [[880, 0], [659.25, 0.07]],
+  open:  [[880, 0]],
+  close: [[659.25, 0]],
+  click: [[783.99, 0]],
+  jump:  [[440, 0], [523.25, 0.06], [659.25, 0.12], [880, 0.18]],
+};
+export function uiSound(kind) {
+  if (!_enabled || !_ctx || !_uiGain) return;
+  const now = _ctx.currentTime + 0.01;
+  if (kind === 'shutter') {
+    const src = _ctx.createBufferSource();
+    src.buffer = makeWhiteNoiseBuffer(_ctx, 0.12);
+    const hp = _ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(2500, now);
+    const env = _ctx.createGain();
+    env.gain.setValueAtTime(0.5, now);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+    src.connect(hp);
+    hp.connect(env);
+    env.connect(_uiGain);
+    src.start(now);
+    return;
+  }
+  for (const [freq, dt] of UI_NOTES[kind] || UI_NOTES.click) _pluck(freq, now + dt, 0.18, 0.35, _uiGain);
 }
 
 // ── Internal: dawn/dusk bird chirp scheduler ─────────────────────────────────
@@ -347,6 +463,7 @@ export function setAudioEnabled(enabled) {
 
     const now = _ctx.currentTime;
     _masterGain.gain.setTargetAtTime(0.25, now, 0.15); // ~0.5s fade in (τ=0.15s)
+    if (!_musicTimer) _musicTick();
   } else {
     if (!_masterGain) return; // graph not built yet — nothing to do
     const now = _ctx.currentTime;
@@ -397,6 +514,7 @@ export function setDayFactor(f) {
   if (Math.abs(f - _lastDayFactor) < 0.01) return; // throttle
   const prevF = _lastDayFactor;
   _lastDayFactor = f;
+  _dayF = f;
 
   const now = _ctx.currentTime;
   const τ = 4.0; // long time constant so it never zippers
