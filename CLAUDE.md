@@ -89,6 +89,8 @@ Always serve from HTTP. `file://` blocks ES module imports. The importmap in `in
 | `js/icons.js` | Pixel icon grids + `hydrateIcons` / `setIcon` |
 | `assets/tex/` | `nebula.webp` (AI-generated night sky) |
 | `tools/gen_nebula.py` | Gemini prompt + call that made the night sky |
+| `tools/readme_shots.py` | Re-shoots the README WebPs into `screenshots/` (or an `OUT_DIR` argument) |
+| `tools/record_gif.py` | Records `screenshots/demo.gif`; first/mid check frames go to `D:\Projects\scratch\flat-earth-sim\` |
 | `serve.py` | No-cache dev server |
 | `test/` | `node --test` suites (`sim.test.js`, `state.test.js`) |
 | `.github/workflows/test.yml` | CI: `node --test` on push / PR |
